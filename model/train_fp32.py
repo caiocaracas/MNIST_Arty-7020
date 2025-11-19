@@ -215,3 +215,13 @@ def parse_args() -> Config:
       target_accuracy=args.target_accuracy,
   )
   return cfg
+
+
+def main() -> None:
+  """Entry point for FP32 training and export pipeline."""
+  cfg = parse_args()
+  set_seed(cfg.seed)
+
+  use_cuda = cfg.device == "cuda" and torch.cuda.is_available()
+  device = torch.device("cuda" if use_cuda else "cpu")
+  print(f"Using device: {device}")
