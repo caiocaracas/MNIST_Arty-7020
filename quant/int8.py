@@ -317,3 +317,31 @@ def quantize_model(cfg: Config) -> None:
 
   print(f"Saved INT8 spec to: {spec_path}")
 
+def parse_args() -> Config:
+  """Parse command line arguments into a Config object."""
+  parser = argparse.ArgumentParser(
+    description="Quantize FP32 MNIST MLP to INT8 and export artifacts."
+  )
+  parser.add_argument("--artifacts_dir", type=str, default="./artifacts")
+  parser.add_argument("--seed", type=int, default=42)
+  parser.add_argument("--num_bits_activation", type=int, default=8)
+  parser.add_argument("--num_bits_weight", type=int, default=8)
+
+  args = parser.parse_args()
+  return Config(
+    artifacts_dir=args.artifacts_dir,
+    seed=args.seed,
+    num_bits_activation=args.num_bits_activation,
+    num_bits_weight=args.num_bits_weight,
+  )
+
+
+def main() -> None:
+  """Entry point for INT8 quantization."""
+  cfg = parse_args()
+  set_seed(cfg.seed)
+  quantize_model(cfg)
+
+
+if __name__ == "__main__":
+  main()
