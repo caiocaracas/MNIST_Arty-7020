@@ -175,3 +175,43 @@ def save_artifacts(
       f.write(f"weight_decay={cfg.weight_decay}\n")
       f.write(f"seed={cfg.seed}\n")
   print(f"Saved training metadata to: {meta_path}")
+
+def parse_args() -> Config:
+  """Parse command line arguments into a Config object."""
+  parser = argparse.ArgumentParser(
+      description="Train FP32 MLP on MNIST and export model artifacts."
+  )
+  parser.add_argument("--data_dir", type=str, default="./data")
+  parser.add_argument("--artifacts_dir", type=str, default="./artifacts")
+  parser.add_argument("--batch_size", type=int, default=128)
+  parser.add_argument("--num_epochs", type=int, default=10)
+  parser.add_argument("--learning_rate", type=float, default=1e-3)
+  parser.add_argument("--weight_decay", type=float, default=1e-4)
+  parser.add_argument("--num_workers", type=int, default=4)
+  parser.add_argument("--seed", type=int, default=42)
+  parser.add_argument(
+      "--device",
+      type=str,
+      default="cuda",
+      choices=["cuda", "cpu"],
+      help="Preferred device; falls back to CPU if CUDA unavailable.",
+  )
+  parser.add_argument("--log_interval", type=int, default=100)
+  parser.add_argument("--target_accuracy", type=float, default=0.985)
+
+  args = parser.parse_args()
+
+  cfg = Config(
+      data_dir=args.data_dir,
+      artifacts_dir=args.artifacts_dir,
+      batch_size=args.batch_size,
+      num_epochs=args.num_epochs,
+      learning_rate=args.learning_rate,
+      weight_decay=args.weight_decay,
+      num_workers=args.num_workers,
+      seed=args.seed,
+      device=args.device,
+      log_interval=args.log_interval,
+      target_accuracy=args.target_accuracy,
+  )
+  return cfg
