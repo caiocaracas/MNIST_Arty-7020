@@ -25,7 +25,7 @@ class Config:
   data_dir: str = "./data"
   artifacts_dir: str = "./artifacts"
   batch_size: int = 128
-  num_epochs: int = 10
+  num_epochs: int = 20
   learning_rate: float = 1e-3
   weight_decay: float = 1e-4
   num_workers: int = 4
@@ -157,13 +157,14 @@ def save_artifacts(
   model.eval()
   dummy_input = torch.randn(1, 1, 28, 28, device=device)
   torch.onnx.export(
-      model,
-      dummy_input,
-      onnx_path,
-      input_names=["input"],
-      output_names=["logits"],
-      opset_version=13,
-      dynamic_axes={"input": {0: "batch"}, "logits": {0: "batch"}},
+    model,
+    dummy_input,
+    onnx_path,
+    input_names=["input"],
+    output_names=["logits"],
+    opset_version=18,     
+    dynamic_axes=None,    
+    dynamo=False,       
   )
   print(f"Saved ONNX model to: {onnx_path}")
 
