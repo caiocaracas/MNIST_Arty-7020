@@ -26,7 +26,7 @@ class Config:
   artifacts_dir: str = "./artifacts"
   batch_size: int = 128
   num_epochs: int = 20
-  learning_rate: float = 1e-3
+  learning_rate: float = 5e-4
   weight_decay: float = 1e-4
   num_workers: int = 4
   seed: int = 42
