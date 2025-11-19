@@ -125,3 +125,17 @@ def train_one_epoch(
             f"| Train loss: {avg_loss:.4f}"
       )
   return running_loss / num_samples
+
+@torch.no_grad()
+def evaluate(model: nn.Module, loader: DataLoader, device: torch.device) -> float:
+  """Compute classification accuracy on the given DataLoader."""
+  model.eval()
+  correct = 0
+  total = 0
+  for inputs, targets in loader:
+      inputs, targets = inputs.to(device), targets.to(device)
+      logits = model(inputs)
+      preds = logits.argmax(dim=1)
+      correct += (preds == targets).sum().item()
+      total += targets.size(0)
+  return correct / total
