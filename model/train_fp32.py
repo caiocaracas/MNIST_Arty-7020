@@ -20,26 +20,37 @@ from torchvision import datasets, transforms
 
 @dataclass
 class Config:
-    """Configuration for FP32 training run."""
+  """Configuration for FP32 training run."""
 
-    data_dir: str = "./data"
-    artifacts_dir: str = "./artifacts"
-    batch_size: int = 128
-    num_epochs: int = 10
-    learning_rate: float = 1e-3
-    weight_decay: float = 1e-4
-    num_workers: int = 4
-    seed: int = 42
-    device: str = "cpu"  # "cuda" or "cpu"
-    log_interval: int = 100
-    target_accuracy: float = 0.985  # 98.5%
+  data_dir: str = "./data"
+  artifacts_dir: str = "./artifacts"
+  batch_size: int = 128
+  num_epochs: int = 10
+  learning_rate: float = 1e-3
+  weight_decay: float = 1e-4
+  num_workers: int = 4
+  seed: int = 42
+  device: str = "cpu"  # "cuda" or "cpu"
+  log_interval: int = 100
+  target_accuracy: float = 0.985  # 98.5%
 
 class MLP_MNIST(nn.Module):
-    """Simple MLP: 784 → 128 → 64 → 32 → 10."""
+  """Simple MLP: 784 → 128 → 64 → 32 → 10."""
 
-    def __init__(self) -> None:
-        super().__init__()
-        self.fc1 = nn.Linear(784, 128)
-        self.fc2 = nn.Linear(128, 64)
-        self.fc3 = nn.Linear(64, 32)
-        self.fc4 = nn.Linear(32, 10)
+  def __init__(self) -> None:
+    super().__init__()
+    self.fc1 = nn.Linear(784, 128)
+    self.fc2 = nn.Linear(128, 64)
+    self.fc3 = nn.Linear(64, 32)
+    self.fc4 = nn.Linear(32, 10)
+
+  def forward(self, x: torch.Tensor) -> torch.Tensor:
+    # x: (N, 1, 28, 28)
+    x = x.view(x.size(0), -1)  # (N, 784)
+    x = F.relu(self.fc1(x))
+    x = F.relu(self.fc2(x))
+    x = F.relu(self.fc3(x))
+    x = self.fc4(x)  # logits
+    return x
+    
+  
