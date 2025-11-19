@@ -108,3 +108,44 @@ def quantize_weights_per_tensor(
     scale = max_abs / float(qmax)
     w_int = np.round(w / scale).astype(np.int8)
   return w_int, float(scale)
+
+def quantize_bias(
+  bias: torch.Tensor, scale_input: float, scale_weight: float
+) -> np.ndarray:
+  """Quantize bias to INT32 using scale = S_in * S_w."""
+  b = bias.detach().cpu().numpy()
+  scale = scale_input * scale_weight
+  if scale == 0.0:
+      return np.zeros_like(b, dtype=np.int32)
+  b_int = np.round(b / scale).astype(np.int32)
+  return b_int
+
+def quantize_multiplier(real_multiplier: float, max_shift: int = 31) -> Tuple[int, int]:
+  """Approximate real_multiplier with M / 2^shift."""
+  if real_multiplier <= 0.0:
+    return 0, 0
+
+  best_M = 0
+  best_shift = 0
+  min_err = float("inf")
+  max_M = 2**30 - 1
+
+  for shift in range(max_shift + 1):
+    M = int(round(real_multiplier * (1 << shift)))
+    if M == 0 or abs(M) > max_M:
+        continue
+    approx = M / float(1 << shift)
+    err = abs(approx - real_multiplier)
+    if err < min_err:
+        best_M, best_shift, min_err = M, shift, err
+
+  if best_M == 0:
+    best_shift = max_shift
+    best_M = int(max(1, min(max_M, round(real_multiplier * (1 << best_shift)))))
+
+  return int(best_M), int(best_shift)
+
+def save_bin(arr: np.ndarray, path: Path, dtype: np.dtype) -> None:
+  """Save array as raw binary file (C-order flatten)."""
+  path.parent.mkdir(parents=True, exist_ok=True)
+  arr.astype(dtype).ravel().tofile(path)
