@@ -196,3 +196,39 @@ def parse_args() -> Config:
     max_calib_batches=args.max_calib_batches,
   )
   return cfg
+
+def main() -> None:
+  """Entry point for activation statistics collection."""
+  cfg = parse_args()
+  set_seed(cfg.seed)
+
+  use_cuda = cfg.device == "cuda" and torch.cuda.is_available()
+  device = torch.device("cuda" if use_cuda else "cpu")
+  print(f"Using device: {device}")
+
+  # Load model
+  artifacts_dir = Path(cfg.artifacts_dir)
+  state_dict_path = artifacts_dir / "model_fp32.pth"
+  if not state_dict_path.is_file():
+    raise FileNotFoundError(
+      f"FP32 model state_dict not found at {state_dict_path}. "
+      "Run train_fp32.py first."
+    )
+
+  model = MLP_MNIST().to(device)
+  state_dict = torch.load(state_dict_path, map_location=device)
+  model.load_state_dict(state_dict)
+  print(f"Loaded FP32 model from: {state_dict_path}")
+
+  # Build calibration loader
+  calib_loader = build_dataloader(cfg, device)
+
+  # Collect stats
+  stats = collect_stats(model, calib_loader, device, cfg)
+
+  # Save stats
+  num_batches_used = min(cfg.max_calib_batches, len(calib_loader))
+  save_stats(stats, cfg, num_batches_used)
+
+if __name__ == "__main__":
+  main()
