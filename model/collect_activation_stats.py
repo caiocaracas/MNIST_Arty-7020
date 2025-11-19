@@ -47,3 +47,17 @@ class MLP_MNIST(nn.Module):
     x = F.relu(self.fc3(x))
     x = self.fc4(x)
     return x
+
+@dataclass
+class MinMaxStats:
+  """Running min/max stats for a tensor."""
+
+  min_val: float = float("inf")
+  max_val: float = float("-inf")
+  num_samples: int = 0
+
+  def update(self, tensor: torch.Tensor) -> None:
+    t = tensor.detach()
+    self.min_val = min(self.min_val, float(t.min().item()))
+    self.max_val = max(self.max_val, float(t.max().item()))
+    self.num_samples += t.shape[0]
