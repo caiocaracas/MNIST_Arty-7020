@@ -1,0 +1,1 @@
+# Treina o modelo FP32, valida, salva pesos e ONNX.

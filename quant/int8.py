@@ -1,0 +1,1 @@
+# Implementa o forward usando os pesos quantizados e o JSON.

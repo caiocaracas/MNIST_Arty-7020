@@ -1,0 +1,1 @@
+#Usa os min/max + pesos FP32 para gerar a versão INT8 
