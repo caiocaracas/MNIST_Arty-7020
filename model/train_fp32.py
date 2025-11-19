@@ -139,3 +139,39 @@ def evaluate(model: nn.Module, loader: DataLoader, device: torch.device) -> floa
       correct += (preds == targets).sum().item()
       total += targets.size(0)
   return correct / total
+
+def save_artifacts(
+  model: nn.Module, cfg: Config, device: torch.device, test_accuracy: float
+) -> None:
+  """Export FP32 model as .pth and .onnx into artifacts directory."""
+  artifacts_dir = Path(cfg.artifacts_dir)
+  artifacts_dir.mkdir(parents=True, exist_ok=True)
+
+  state_dict_path = artifacts_dir / "model_fp32.pth"
+  onnx_path = artifacts_dir / "model_fp32.onnx"
+  meta_path = artifacts_dir / "training_meta.txt"
+
+  torch.save(model.state_dict(), state_dict_path)
+  print(f"Saved PyTorch state_dict to: {state_dict_path}")
+
+  model.eval()
+  dummy_input = torch.randn(1, 1, 28, 28, device=device)
+  torch.onnx.export(
+      model,
+      dummy_input,
+      onnx_path,
+      input_names=["input"],
+      output_names=["logits"],
+      opset_version=13,
+      dynamic_axes={"input": {0: "batch"}, "logits": {0: "batch"}},
+  )
+  print(f"Saved ONNX model to: {onnx_path}")
+
+  with meta_path.open("w", encoding="utf-8") as f:
+      f.write(f"test_accuracy={test_accuracy:.6f}\n")
+      f.write(f"num_epochs={cfg.num_epochs}\n")
+      f.write(f"batch_size={cfg.batch_size}\n")
+      f.write(f"learning_rate={cfg.learning_rate}\n")
+      f.write(f"weight_decay={cfg.weight_decay}\n")
+      f.write(f"seed={cfg.seed}\n")
+  print(f"Saved training metadata to: {meta_path}")
