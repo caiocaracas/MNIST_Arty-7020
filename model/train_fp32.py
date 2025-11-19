@@ -225,3 +225,10 @@ def main() -> None:
   use_cuda = cfg.device == "cuda" and torch.cuda.is_available()
   device = torch.device("cuda" if use_cuda else "cpu")
   print(f"Using device: {device}")
+  
+  train_loader, test_loader = build_dataloaders(cfg)
+
+  model = MLP_MNIST().to(device)
+  optimizer = torch.optim.Adam(
+      model.parameters(), lr=cfg.learning_rate, weight_decay=cfg.weight_decay
+  )
