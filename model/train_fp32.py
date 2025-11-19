@@ -232,3 +232,27 @@ def main() -> None:
   optimizer = torch.optim.Adam(
       model.parameters(), lr=cfg.learning_rate, weight_decay=cfg.weight_decay
   )
+
+  best_acc = 0.0
+  for epoch in range(1, cfg.num_epochs + 1):
+    train_loss = train_one_epoch(
+        model, train_loader, optimizer, device, epoch, cfg.log_interval
+    )
+    test_acc = evaluate(model, test_loader, device)
+    best_acc = max(best_acc, test_acc)
+    print(
+      f"Epoch {epoch:02d} completed | "
+      f"Train loss: {train_loss:.4f} | Test acc: {test_acc * 100:.2f}% "
+      f"| Best: {best_acc * 100:.2f}%"
+    )
+
+  print(f"Final test accuracy: {best_acc * 100:.2f}%")
+  if best_acc < cfg.target_accuracy:
+    print(
+      f"Warning: target accuracy {cfg.target_accuracy * 100:.2f}% "
+      f"not reached (best={best_acc * 100:.2f}%)."
+    )
+  save_artifacts(model, cfg, device, best_acc)
+
+if __name__ == "__main__":
+    main()
