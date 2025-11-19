@@ -135,3 +135,28 @@ def collect_stats(
       stats["fc4_out"].update(a4)
 
   return stats
+
+def save_stats(
+  stats: Dict[str, MinMaxStats], cfg: Config, num_batches: int
+) -> None:
+  """Serialize stats to JSON file in artifacts directory."""
+  artifacts_dir = Path(cfg.artifacts_dir)
+  artifacts_dir.mkdir(parents=True, exist_ok=True)
+
+  out_path = artifacts_dir / "activation_stats.json"
+
+  payload = {
+    "meta": {
+      "num_batches": num_batches,
+      "batch_size": cfg.batch_size,
+      "seed": cfg.seed,
+    },
+    "tensors": {
+      name: asdict(s) for name, s in stats.items()
+    },
+  }
+
+  with out_path.open("w", encoding="utf-8") as f:
+    json.dump(payload, f, indent=2)
+
+  print(f"Saved activation stats to: {out_path}")
