@@ -53,3 +53,43 @@ class MLP_MNIST(nn.Module):
     x = self.fc4(x)
     return x
 
+def set_seed(seed: int) -> None:
+  """Configure deterministic behavior for reproducibility."""
+  random.seed(seed)
+  np.random.seed(seed)
+  torch.manual_seed(seed)
+  torch.cuda.manual_seed_all(seed)
+  torch.backends.cudnn.deterministic = True
+  torch.backends.cudnn.benchmark = False
+
+
+def load_activation_stats(path: Path) -> Dict:
+  """Load activation min/max statistics from JSON."""
+  with path.open("r", encoding="utf-8") as f:
+    return json.load(f)
+
+
+def calc_activation_qparams(
+  min_val: float,
+  max_val: float,
+  num_bits: int = 8,
+  signed: bool = True,
+) -> Tuple[float, int, int, int]:
+  """Compute scale and zero-point for activation tensor."""
+  if signed:
+    qmin, qmax = -2 ** (num_bits - 1), 2 ** (num_bits - 1) - 1
+  else:
+    qmin, qmax = 0, 2**num_bits - 1
+
+  min_val = float(min_val)
+  max_val = float(max_val)
+
+  if min_val == max_val:
+    if min_val == 0.0:
+      return 1.0, 0, qmin, qmax
+    max_val = min_val + 1e-6
+
+  scale = (max_val - min_val) / float(qmax - qmin)
+  zero_point = round(qmin - min_val / scale)
+  zero_point = int(max(qmin, min(qmax, zero_point)))
+  return float(scale), zero_point, qmin, qmax
