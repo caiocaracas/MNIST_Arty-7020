@@ -18,3 +18,15 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
+@dataclass
+class Config:
+  """Configuration for activation statistics collection."""
+
+  data_dir: str = "./data"
+  artifacts_dir: str = "./artifacts"
+  batch_size: int = 256
+  num_workers: int = 4
+  seed: int = 42
+  device: str = "cpu"  # "cuda" or "cpu"
+  max_calib_batches: int = 200  # how many batches to use for stats
+
