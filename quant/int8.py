@@ -93,3 +93,18 @@ def calc_activation_qparams(
   zero_point = round(qmin - min_val / scale)
   zero_point = int(max(qmin, min(qmax, zero_point)))
   return float(scale), zero_point, qmin, qmax
+
+def quantize_weights_per_tensor(
+  weight: torch.Tensor, num_bits: int = 8
+) -> Tuple[np.ndarray, float]:
+  """Symmetric per-tensor INT8 quantization for weights."""
+  w = weight.detach().cpu().numpy()
+  max_abs = float(np.max(np.abs(w)))
+  if max_abs == 0.0:
+    scale = 1.0
+    w_int = np.zeros_like(w, dtype=np.int8)
+  else:
+    qmax = 2 ** (num_bits - 1) - 1  # 127
+    scale = max_abs / float(qmax)
+    w_int = np.round(w / scale).astype(np.int8)
+  return w_int, float(scale)
