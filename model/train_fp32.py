@@ -35,24 +35,23 @@ class Config:
   target_accuracy: float = 0.985  # 98.5%
 
 class MLP_MNIST(nn.Module):
-  """Simple MLP: 784 → 128 → 64 → 32 → 10."""
+  """MLP: 784 → 256 → 128 → 64 → 10."""
 
   def __init__(self) -> None:
     super().__init__()
-    self.fc1 = nn.Linear(784, 128)
-    self.fc2 = nn.Linear(128, 64)
-    self.fc3 = nn.Linear(64, 32)
-    self.fc4 = nn.Linear(32, 10)
+    self.fc1 = nn.Linear(784, 256)
+    self.fc2 = nn.Linear(256, 128)
+    self.fc3 = nn.Linear(128, 64)
+    self.fc4 = nn.Linear(64, 10)
 
   def forward(self, x: torch.Tensor) -> torch.Tensor:
-    # x: (N, 1, 28, 28)
-    x = x.view(x.size(0), -1)  # (N, 784)
+    x = x.view(x.size(0), -1)
     x = F.relu(self.fc1(x))
     x = F.relu(self.fc2(x))
     x = F.relu(self.fc3(x))
-    x = self.fc4(x)  # logits
+    x = self.fc4(x)
     return x
-  
+
 def set_seed(seed: int) -> None:
   """Configure deterministic behavior for reproducibility."""
   random.seed(seed)
@@ -62,34 +61,37 @@ def set_seed(seed: int) -> None:
   torch.backends.cudnn.deterministic = True
   torch.backends.cudnn.benchmark = False
 
-def build_dataloaders(cfg: Config) -> Tuple[DataLoader, DataLoader]:
-  """Create DataLoaders for MNIST train and test sets."""
-  transform = transforms.Compose(
-      [
-          transforms.ToTensor(),  # [0, 1]
-      ]
-  )
-  train_ds = datasets.MNIST(
-      root=cfg.data_dir, train=True, download=True, transform=transform
-  )
-  test_ds = datasets.MNIST(
-      root=cfg.data_dir, train=False, download=True, transform=transform
-  )
-  train_loader = DataLoader(
-      train_ds,
-      batch_size=cfg.batch_size,
-      shuffle=True,
-      num_workers=cfg.num_workers,
-      pin_memory=True,
-  )
-  test_loader = DataLoader(
-      test_ds,
-      batch_size=cfg.batch_size,
-      shuffle=False,
-      num_workers=cfg.num_workers,
-      pin_memory=True,
-  )
-  return train_loader, test_loader
+def build_dataloaders(cfg: Config, device: torch.device) -> Tuple[DataLoader, DataLoader]:
+    """Create DataLoaders for MNIST train and test sets."""
+    transform = transforms.Compose(
+        [
+            transforms.ToTensor(),
+            transforms.Normalize((0.1307,), (0.3081,)),
+        ]
+    )
+    train_ds = datasets.MNIST(
+        root=cfg.data_dir, train=True, download=True, transform=transform
+    )
+    test_ds = datasets.MNIST(
+        root=cfg.data_dir, train=False, download=True, transform=transform
+    )
+    use_pin_memory = device.type == "cuda"
+
+    train_loader = DataLoader(
+        train_ds,
+        batch_size=cfg.batch_size,
+        shuffle=True,
+        num_workers=cfg.num_workers,
+        pin_memory=use_pin_memory,
+    )
+    test_loader = DataLoader(
+        test_ds,
+        batch_size=cfg.batch_size,
+        shuffle=False,
+        num_workers=cfg.num_workers,
+        pin_memory=use_pin_memory,
+    )
+    return train_loader, test_loader
 
 def train_one_epoch(
   model: nn.Module,
@@ -227,7 +229,7 @@ def main() -> None:
   device = torch.device("cuda" if use_cuda else "cpu")
   print(f"Using device: {device}")
   
-  train_loader, test_loader = build_dataloaders(cfg)
+  train_loader, test_loader = build_dataloaders(cfg, device)
 
   model = MLP_MNIST().to(device)
   optimizer = torch.optim.Adam(
