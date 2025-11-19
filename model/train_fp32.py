@@ -25,14 +25,14 @@ class Config:
   data_dir: str = "./data"
   artifacts_dir: str = "./artifacts"
   batch_size: int = 128
-  num_epochs: int = 20
-  learning_rate: float = 5e-4
+  num_epochs: int = 20        
+  learning_rate: float = 5e-4  
   weight_decay: float = 1e-4
   num_workers: int = 4
   seed: int = 42
-  device: str = "cpu"  # "cuda" or "cpu"
+  device: str = "cuda"     # "cuda" ou "cpu"
   log_interval: int = 100
-  target_accuracy: float = 0.985  # 98.5%
+  target_accuracy: float = 0.985
 
 class MLP_MNIST(nn.Module):
   """MLP: 784 → 256 → 128 → 64 → 10."""
