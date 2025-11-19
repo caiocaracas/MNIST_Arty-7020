@@ -160,3 +160,39 @@ def save_stats(
     json.dump(payload, f, indent=2)
 
   print(f"Saved activation stats to: {out_path}")
+
+def parse_args() -> Config:
+  """Parse command line arguments into a Config object."""
+  parser = argparse.ArgumentParser(
+      description="Collect activation min/max stats for MNIST MLP."
+  )
+  parser.add_argument("--data_dir", type=str, default="./data")
+  parser.add_argument("--artifacts_dir", type=str, default="./artifacts")
+  parser.add_argument("--batch_size", type=int, default=256)
+  parser.add_argument("--num_workers", type=int, default=4)
+  parser.add_argument("--seed", type=int, default=42)
+  parser.add_argument(
+    "--device",
+    type=str,
+    default="cuda",
+    choices=["cuda", "cpu"],
+    help="Preferred device; falls back to CPU if CUDA unavailable.",
+  )
+  parser.add_argument(
+    "--max_calib_batches",
+    type=int,
+    default=200,
+    help="Number of batches from the train set used for calibration.",
+  )
+
+  args = parser.parse_args()
+  cfg = Config(
+    data_dir=args.data_dir,
+    artifacts_dir=args.artifacts_dir,
+    batch_size=args.batch_size,
+    num_workers=args.num_workers,
+    seed=args.seed,
+    device=args.device,
+    max_calib_batches=args.max_calib_batches,
+  )
+  return cfg
