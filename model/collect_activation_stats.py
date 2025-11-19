@@ -61,3 +61,77 @@ class MinMaxStats:
     self.min_val = min(self.min_val, float(t.min().item()))
     self.max_val = max(self.max_val, float(t.max().item()))
     self.num_samples += t.shape[0]
+
+def set_seed(seed: int) -> None:
+  """Configure deterministic behavior for reproducibility."""
+  random.seed(seed)
+  np.random.seed(seed)
+  torch.manual_seed(seed)
+  torch.cuda.manual_seed_all(seed)
+  torch.backends.cudnn.deterministic = True
+  torch.backends.cudnn.benchmark = False
+
+
+def build_dataloader(cfg: Config, device: torch.device) -> DataLoader:
+  """Create DataLoader for MNIST train set used as calibration data."""
+  transform = transforms.Compose(
+      [
+        transforms.ToTensor(),  # [0, 1];
+        transforms.Normalize((0.1307,), (0.3081,)),
+      ]
+  )
+  train_ds = datasets.MNIST(
+      root=cfg.data_dir, train=True, download=True, transform=transform
+  )
+  use_pin_memory = device.type == "cuda"
+
+  loader = DataLoader(
+      train_ds,
+      batch_size=cfg.batch_size,
+      shuffle=True,
+      num_workers=cfg.num_workers,
+      pin_memory=use_pin_memory,
+  )
+  return loader
+
+def collect_stats(
+  model: nn.Module, loader: DataLoader, device: torch.device, cfg: Config
+) -> Dict[str, MinMaxStats]:
+  """Run a forward pass on a calibration subset and collect min/max stats."""
+  model.eval()
+  stats: Dict[str, MinMaxStats] = {
+    "fc1_in": MinMaxStats(),
+    "fc1_out": MinMaxStats(),
+    "fc2_out": MinMaxStats(),
+    "fc3_out": MinMaxStats(),
+    "fc4_out": MinMaxStats(),  # logits
+  }
+
+  with torch.no_grad():
+    for batch_idx, (inputs, _) in enumerate(loader):
+      if batch_idx >= cfg.max_calib_batches:
+          break
+
+      inputs = inputs.to(device)
+
+      # Input to first layer
+      x = inputs.view(inputs.size(0), -1)
+      stats["fc1_in"].update(x)
+
+      # Layer 1
+      a1 = torch.relu(model.fc1(x))
+      stats["fc1_out"].update(a1)
+
+      # Layer 2
+      a2 = torch.relu(model.fc2(a1))
+      stats["fc2_out"].update(a2)
+
+      # Layer 3
+      a3 = torch.relu(model.fc3(a2))
+      stats["fc3_out"].update(a3)
+
+      # Layer 4 (logits, sem ReLU)
+      a4 = model.fc4(a3)
+      stats["fc4_out"].update(a4)
+
+  return stats
