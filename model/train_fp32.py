@@ -52,44 +52,76 @@ class MLP_MNIST(nn.Module):
     x = F.relu(self.fc3(x))
     x = self.fc4(x)  # logits
     return x
-    
-  def set_seed(seed: int) -> None:
-    """Configure deterministic behavior for reproducibility."""
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
+  
+def set_seed(seed: int) -> None:
+  """Configure deterministic behavior for reproducibility."""
+  random.seed(seed)
+  np.random.seed(seed)
+  torch.manual_seed(seed)
+  torch.cuda.manual_seed_all(seed)
+  torch.backends.cudnn.deterministic = True
+  torch.backends.cudnn.benchmark = False
 
-  def build_dataloaders(cfg: Config) -> Tuple[DataLoader, DataLoader]:
-    """Create DataLoaders for MNIST train and test sets."""
-    transform = transforms.Compose(
-        [
-            transforms.ToTensor(),  # [0, 1]
-        ]
-    )
+def build_dataloaders(cfg: Config) -> Tuple[DataLoader, DataLoader]:
+  """Create DataLoaders for MNIST train and test sets."""
+  transform = transforms.Compose(
+      [
+          transforms.ToTensor(),  # [0, 1]
+      ]
+  )
+  train_ds = datasets.MNIST(
+      root=cfg.data_dir, train=True, download=True, transform=transform
+  )
+  test_ds = datasets.MNIST(
+      root=cfg.data_dir, train=False, download=True, transform=transform
+  )
+  train_loader = DataLoader(
+      train_ds,
+      batch_size=cfg.batch_size,
+      shuffle=True,
+      num_workers=cfg.num_workers,
+      pin_memory=True,
+  )
+  test_loader = DataLoader(
+      test_ds,
+      batch_size=cfg.batch_size,
+      shuffle=False,
+      num_workers=cfg.num_workers,
+      pin_memory=True,
+  )
+  return train_loader, test_loader
 
-    train_ds = datasets.MNIST(
-        root=cfg.data_dir, train=True, download=True, transform=transform
-    )
-    test_ds = datasets.MNIST(
-        root=cfg.data_dir, train=False, download=True, transform=transform
-    )
+def train_one_epoch(
+  model: nn.Module,
+  loader: DataLoader,
+  optimizer: torch.optim.Optimizer,
+  device: torch.device,
+  epoch: int,
+  log_interval: int,
+) -> float:
+  """Train one epoch and return mean loss."""
+  model.train()
+  criterion = nn.CrossEntropyLoss()
+  running_loss = 0.0
+  num_samples = 0
 
-    train_loader = DataLoader(
-        train_ds,
-        batch_size=cfg.batch_size,
-        shuffle=True,
-        num_workers=cfg.num_workers,
-        pin_memory=True,
-    )
-    test_loader = DataLoader(
-        test_ds,
-        batch_size=cfg.batch_size,
-        shuffle=False,
-        num_workers=cfg.num_workers,
-        pin_memory=True,
-    )
-    return train_loader, test_loader
+  for batch_idx, (inputs, targets) in enumerate(loader):
+      inputs, targets = inputs.to(device), targets.to(device)
 
+      optimizer.zero_grad(set_to_none=True)
+      logits = model(inputs)
+      loss = criterion(logits, targets)
+      loss.backward()
+      optimizer.step()
+
+      batch_size = inputs.size(0)
+      running_loss += loss.item() * batch_size
+      num_samples += batch_size
+
+      if (batch_idx + 1) % log_interval == 0:
+        avg_loss = running_loss / num_samples
+        print(
+            f"Epoch {epoch:02d} | Step {batch_idx + 1:04d}/{len(loader):04d} "
+            f"| Train loss: {avg_loss:.4f}"
+      )
+  return running_loss / num_samples
