@@ -30,7 +30,7 @@ class Config:
   weight_decay: float = 1e-4
   num_workers: int = 4
   seed: int = 42
-  device: str = "cuda"     # "cuda" ou "cpu"
+  device: str = "cpu"     # "cuda" ou "cpu"
   log_interval: int = 100
   target_accuracy: float = 0.985
 

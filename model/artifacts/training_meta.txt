@@ -1,4 +1,4 @@
-test_accuracy=0.982600
+test_accuracy=0.982800
 num_epochs=20
 batch_size=128
 learning_rate=0.001
