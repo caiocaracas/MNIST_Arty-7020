@@ -1,0 +1,180 @@
+{
+  "model": {
+    "name": "MLP_MNIST_INT8",
+    "architecture": "784-256-128-64-10",
+    "artifacts_dir": "artifacts"
+  },
+  "quantization": {
+    "activation_dtype": "int8",
+    "weight_dtype": "int8",
+    "accumulator_dtype": "int32",
+    "activation_qparams": {
+      "fc1_in": {
+        "scale": 0.012728234015259089,
+        "zero_point": -95,
+        "qmin": -128,
+        "qmax": 127
+      },
+      "fc1_out": {
+        "scale": 0.11025713004317939,
+        "zero_point": -128,
+        "qmin": -128,
+        "qmax": 127
+      },
+      "fc2_out": {
+        "scale": 0.08641210069843366,
+        "zero_point": -128,
+        "qmin": -128,
+        "qmax": 127
+      },
+      "fc3_out": {
+        "scale": 0.11990203857421874,
+        "zero_point": -128,
+        "qmin": -128,
+        "qmax": 127
+      },
+      "fc4_out": {
+        "scale": 0.27925103879442403,
+        "zero_point": -20,
+        "qmin": -128,
+        "qmax": 127
+      }
+    }
+  },
+  "layers": [
+    {
+      "name": "fc1",
+      "type": "Linear",
+      "in_features": 784,
+      "out_features": 256,
+      "input_activation": "fc1_in",
+      "output_activation": "fc1_out",
+      "relu": true,
+      "weight": {
+        "scale": 0.004410632951991764,
+        "zero_point": 0,
+        "file": "weights/fc1_W_int8.bin",
+        "shape": [
+          256,
+          784
+        ],
+        "dtype": "int8"
+      },
+      "bias": {
+        "scale": 5.6139568368364186e-05,
+        "file": "bias/fc1_b_int32.bin",
+        "dtype": "int32"
+      },
+      "requant": {
+        "real_multiplier": 0.0005091695053769181,
+        "M": 1093433,
+        "shift": 31,
+        "output_zero_point": -128
+      }
+    },
+    {
+      "name": "fc2",
+      "type": "Linear",
+      "in_features": 256,
+      "out_features": 128,
+      "input_activation": "fc1_out",
+      "output_activation": "fc2_out",
+      "relu": true,
+      "weight": {
+        "scale": 0.003160264313690306,
+        "zero_point": 0,
+        "file": "weights/fc2_W_int8.bin",
+        "shape": [
+          128,
+          256
+        ],
+        "dtype": "int8"
+      },
+      "bias": {
+        "scale": 0.0003484416734053711,
+        "file": "bias/fc2_b_int32.bin",
+        "dtype": "int32"
+      },
+      "requant": {
+        "real_multiplier": 0.004032324993711061,
+        "M": 1082419,
+        "shift": 28,
+        "output_zero_point": -128
+      }
+    },
+    {
+      "name": "fc3",
+      "type": "Linear",
+      "in_features": 128,
+      "out_features": 64,
+      "input_activation": "fc2_out",
+      "output_activation": "fc3_out",
+      "relu": true,
+      "weight": {
+        "scale": 0.0026598021270721915,
+        "zero_point": 0,
+        "file": "weights/fc3_W_int8.bin",
+        "shape": [
+          64,
+          128
+        ],
+        "dtype": "int8"
+      },
+      "bias": {
+        "scale": 0.00022983908924247026,
+        "file": "bias/fc3_b_int32.bin",
+        "dtype": "int32"
+      },
+      "requant": {
+        "real_multiplier": 0.0019168905881462644,
+        "M": 4116491,
+        "shift": 31,
+        "output_zero_point": -128
+      }
+    },
+    {
+      "name": "fc4",
+      "type": "Linear",
+      "in_features": 64,
+      "out_features": 10,
+      "input_activation": "fc3_out",
+      "output_activation": "fc4_out",
+      "relu": false,
+      "weight": {
+        "scale": 0.0030796633461328943,
+        "zero_point": 0,
+        "file": "weights/fc4_W_int8.bin",
+        "shape": [
+          10,
+          64
+        ],
+        "dtype": "int8"
+      },
+      "bias": {
+        "scale": 0.00036925791332363385,
+        "file": "bias/fc4_b_int32.bin",
+        "dtype": "int32"
+      },
+      "requant": {
+        "real_multiplier": 0.0013223152720139748,
+        "M": 1419825,
+        "shift": 30,
+        "output_zero_point": -20
+      }
+    }
+  ],
+  "input": {
+    "tensor": "fc1_in",
+    "shape": [
+      1,
+      784
+    ],
+    "normalized": true,
+    "note": "After ToTensor + Normalize((0.1307,), (0.3081,))"
+  },
+  "output": {
+    "tensor": "fc4_out",
+    "dim": 10,
+    "meaning": "logits"
+  }
+}
