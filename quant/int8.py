@@ -273,3 +273,28 @@ def forward_int8_batch(
     x_q = linear_int8(x_q, layer)
 
   return x_q  # logits INT8 (B, num_classes)
+
+def evaluate_int8(cfg: Config, model: Int8Model, device: torch.device) -> None:
+  """Evaluate INT8 accuracy on MNIST test set."""
+  test_loader = build_test_loader(cfg, device)
+
+  correct = 0
+  total = 0
+
+  for batch_idx, (images, targets) in enumerate(test_loader):
+    if cfg.max_eval_batches > 0 and batch_idx >= cfg.max_eval_batches:
+      break
+
+    # images are already normalized by the transform
+    logits_q = forward_int8_batch(images, model)  # (B, 10), int8
+    preds = np.argmax(logits_q.astype(np.int32), axis=1)
+
+    targets_np = targets.cpu().numpy()
+    correct += int((preds == targets_np).sum())
+    total += targets_np.shape[0]
+
+  accuracy = correct / total if total > 0 else 0.0
+  print(
+    f"INT8 accuracy on MNIST test: {accuracy * 100:.2f}% "
+    f"({correct}/{total})"
+  )
