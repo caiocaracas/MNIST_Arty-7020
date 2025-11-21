@@ -298,3 +298,61 @@ def evaluate_int8(cfg: Config, model: Int8Model, device: torch.device) -> None:
     f"INT8 accuracy on MNIST test: {accuracy * 100:.2f}% "
     f"({correct}/{total})"
   )
+
+def parse_args() -> Config:
+  """Parse command-line arguments into a Config object."""
+  parser = argparse.ArgumentParser(
+    description="Run INT8-only inference using int8_spec.json."
+  )
+  parser.add_argument(
+    "--data_dir",
+    type=str,
+    default="../model/data",
+    help="MNIST root directory (same as used by train_fp32.py).",
+  )
+  parser.add_argument(
+    "--artifacts_dir",
+    type=str,
+    default="./artifacts",
+    help="Directory containing int8_spec.json, weights/ and bias/.",
+  )
+  parser.add_argument("--batch_size", type=int, default=256)
+  parser.add_argument("--num_workers", type=int, default=4)
+  parser.add_argument("--seed", type=int, default=42)
+  parser.add_argument(
+    "--max_eval_batches",
+    type=int,
+    default=-1,
+    help="Maximum number of test batches to evaluate (-1 = full test set).",
+    )
+
+  args = parser.parse_args()
+  cfg = Config(
+    data_dir=args.data_dir,
+    artifacts_dir=args.artifacts_dir,
+    batch_size=args.batch_size,
+    num_workers=args.num_workers,
+    seed=args.seed,
+    device="cpu",
+    max_eval_batches=args.max_eval_batches,
+  )
+  return cfg
+
+
+def main() -> None:
+  """Entry point for INT8 inference."""
+  cfg = parse_args()
+  set_seed(cfg.seed)
+
+  device = torch.device(cfg.device)
+  print(f"Using device: {device}")
+  print(f"Using artifacts from: {cfg.artifacts_dir}")
+
+  int8_model = load_int8_model(cfg)
+  print("Loaded INT8 model from int8_spec.json.")
+
+  evaluate_int8(cfg, int8_model, device)
+
+
+if __name__ == "__main__":
+  main()

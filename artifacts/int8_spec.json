@@ -16,26 +16,26 @@
         "qmax": 127
       },
       "fc1_out": {
-        "scale": 0.11025713004317939,
+        "scale": 0.10179015514897365,
         "zero_point": -128,
         "qmin": -128,
         "qmax": 127
       },
       "fc2_out": {
-        "scale": 0.08641210069843366,
+        "scale": 0.09240763047162225,
         "zero_point": -128,
         "qmin": -128,
         "qmax": 127
       },
       "fc3_out": {
-        "scale": 0.11990203857421874,
+        "scale": 0.11186115788478478,
         "zero_point": -128,
         "qmin": -128,
         "qmax": 127
       },
       "fc4_out": {
-        "scale": 0.27925103879442403,
-        "zero_point": -20,
+        "scale": 0.2536004384358724,
+        "zero_point": -11,
         "qmin": -128,
         "qmax": 127
       }
@@ -51,7 +51,7 @@
       "output_activation": "fc1_out",
       "relu": true,
       "weight": {
-        "scale": 0.004410632951991764,
+        "scale": 0.003845633014919251,
         "zero_point": 0,
         "file": "weights/fc1_W_int8.bin",
         "shape": [
@@ -61,14 +61,14 @@
         "dtype": "int8"
       },
       "bias": {
-        "scale": 5.6139568368364186e-05,
+        "scale": 4.8948116950698576e-05,
         "file": "bias/fc1_b_int32.bin",
         "dtype": "int32"
       },
       "requant": {
-        "real_multiplier": 0.0005091695053769181,
-        "M": 1093433,
-        "shift": 31,
+        "real_multiplier": 0.00048087280031218347,
+        "M": 516333,
+        "shift": 30,
         "output_zero_point": -128
       }
     },
@@ -81,7 +81,7 @@
       "output_activation": "fc2_out",
       "relu": true,
       "weight": {
-        "scale": 0.003160264313690306,
+        "scale": 0.0027469539736199567,
         "zero_point": 0,
         "file": "weights/fc2_W_int8.bin",
         "shape": [
@@ -91,13 +91,13 @@
         "dtype": "int8"
       },
       "bias": {
-        "scale": 0.0003484416734053711,
+        "scale": 0.0002796128711618651,
         "file": "bias/fc2_b_int32.bin",
         "dtype": "int32"
       },
       "requant": {
-        "real_multiplier": 0.004032324993711061,
-        "M": 1082419,
+        "real_multiplier": 0.003025863445851826,
+        "M": 812249,
         "shift": 28,
         "output_zero_point": -128
       }
@@ -111,7 +111,7 @@
       "output_activation": "fc3_out",
       "relu": true,
       "weight": {
-        "scale": 0.0026598021270721915,
+        "scale": 0.002387822847666703,
         "zero_point": 0,
         "file": "weights/fc3_W_int8.bin",
         "shape": [
@@ -121,14 +121,14 @@
         "dtype": "int8"
       },
       "bias": {
-        "scale": 0.00022983908924247026,
+        "scale": 0.0002206530513388814,
         "file": "bias/fc3_b_int32.bin",
         "dtype": "int32"
       },
       "requant": {
-        "real_multiplier": 0.0019168905881462644,
-        "M": 4116491,
-        "shift": 31,
+        "real_multiplier": 0.0019725618392592587,
+        "M": 1059011,
+        "shift": 29,
         "output_zero_point": -128
       }
     },
@@ -141,7 +141,7 @@
       "output_activation": "fc4_out",
       "relu": false,
       "weight": {
-        "scale": 0.0030796633461328943,
+        "scale": 0.002590872406020878,
         "zero_point": 0,
         "file": "weights/fc4_W_int8.bin",
         "shape": [
@@ -151,15 +151,15 @@
         "dtype": "int8"
       },
       "bias": {
-        "scale": 0.00036925791332363385,
+        "scale": 0.00028981798726923364,
         "file": "bias/fc4_b_int32.bin",
         "dtype": "int32"
       },
       "requant": {
-        "real_multiplier": 0.0013223152720139748,
-        "M": 1419825,
-        "shift": 30,
-        "output_zero_point": -20
+        "real_multiplier": 0.0011428134314622627,
+        "M": 2454173,
+        "shift": 31,
+        "output_zero_point": -11
       }
     }
   ],
