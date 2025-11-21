@@ -170,3 +170,106 @@ def load_int8_model(cfg: Config) -> Int8Model:
     input_tensor_name=input_tensor_name,
     output_tensor_name=output_tensor_name,
   )
+
+def quantize_input_fc1_in(
+  x_real: np.ndarray, qparams: Dict[str, float]
+) -> np.ndarray:
+  """Quantize real-valued input (flatten, normalized) to INT8 per fc1_in qparams.
+
+  Args:
+    x_real: Float32 array of shape (B, 784) after ToTensor+Normalize.
+    qparams: Dict with keys {scale, zero_point, qmin, qmax}.
+
+  Returns:
+    INT8 array (B, 784) with values in [qmin, qmax].
+  """
+  scale = float(qparams["scale"])
+  zp = int(qparams["zero_point"])
+  qmin = int(qparams["qmin"])
+  qmax = int(qparams["qmax"])
+
+  q = np.round(x_real / scale + zp)
+  q = np.clip(q, qmin, qmax).astype(np.int8)
+  return q
+
+
+def linear_int8(
+  x_q: np.ndarray,
+  layer: Int8Layer,
+  qmin: int = -128,
+  qmax: int = 127,
+) -> np.ndarray:
+  """Compute INT8 Linear layer + requantization.
+
+  Implements:
+    acc = Σ (x_q - Z_in) * w_q + b_int32
+    y_tmp = round(acc * M / 2^shift) + Z_out
+    y_q = clamp(y_tmp, qmin, qmax)
+    if relu: y_q = max(y_q, Z_out)
+
+  Args:
+    x_q: INT8 array (B, in_features).
+    layer: Int8Layer configuration and parameters.
+    qmin: Minimum INT8 value (default -128).
+    qmax: Maximum INT8 value (default 127).
+
+  Returns:
+    INT8 array (B, out_features).
+  """
+  # Subtract input zero-point
+  x_int32 = x_q.astype(np.int32) - layer.Z_in  # (B, in_features)
+
+  # Weights as int32
+  W_int32 = layer.W.astype(np.int32)  # (out_features, in_features)
+
+  # Matrix multiply: (B, in_features) @ (in_features, out_features)
+  acc = x_int32 @ W_int32.T  # (B, out_features), int32
+
+  # Add INT32 bias
+  acc = acc + layer.b.reshape(1, -1)
+
+  # Requantization: acc_int32 * M / 2^shift
+  acc64 = acc.astype(np.int64) * int(layer.M)
+  if layer.shift > 0:
+    # Round to nearest
+    acc64 += 1 << (layer.shift - 1)
+    acc64 >>= layer.shift
+
+  # Add output zero-point
+  acc64 += int(layer.Z_out)
+
+  # Saturate to INT8
+  y = np.clip(acc64, qmin, qmax).astype(np.int8)
+
+  # ReLU in quantized domain: clamp below Z_out (represents real zero)
+  if layer.relu:
+    y = np.maximum(y, layer.Z_out).astype(np.int8)
+
+  return y
+
+
+def forward_int8_batch(
+  x_real_batch: torch.Tensor, model: Int8Model
+) -> np.ndarray:
+  """Run integer-only forward pass for a batch of MNIST images.
+
+  Args:
+    x_real_batch: Float32 tensor (B, 1, 28, 28) after Normalize.
+    model: Int8Model constructed from int8_spec.json.
+
+  Returns:
+    INT8 logits array (B, num_classes).
+  """
+  # Flatten real-valued input
+  x_flat = x_real_batch.view(x_real_batch.size(0), -1)
+  x_np = x_flat.detach().cpu().numpy().astype(np.float32)  # (B, 784)
+
+  # Quantize input according to fc1_in
+  qparams_in = model.activation_qparams[model.input_tensor_name]
+  x_q = quantize_input_fc1_in(x_np, qparams_in)  # (B, 784)
+
+  # Propagate through INT8 layers
+  for layer in model.layers:
+    x_q = linear_int8(x_q, layer)
+
+  return x_q  # logits INT8 (B, num_classes)
