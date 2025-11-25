@@ -13,16 +13,16 @@ architecture sim of tb_mnist_accel_slave_stream is
   signal S_AXIS_ACLK    : std_logic := '0';
   signal S_AXIS_ARESETN : std_logic := '0';
   signal S_AXIS_TREADY  : std_logic;
-  signal S_AXIS_TDATA   : std_logic_vector(C_S_AXIS_TDATA_WIDTH-1 downto 0) := (others => '0');
-  signal S_AXIS_TSTRB   : std_logic_vector((C_S_AXIS_TDATA_WIDTH/8)-1 downto 0) := (others => '0');
-  signal S_AXIS_TLAST   : std_logic := '0';
-  signal S_AXIS_TVALID  : std_logic := '0';
+  signal S_AXIS_TDATA   : std_logic_vector(C_S_AXIS_TDATA_WIDTH - 1 downto 0)     := (others => '0');
+  signal S_AXIS_TSTRB   : std_logic_vector((C_S_AXIS_TDATA_WIDTH/8) - 1 downto 0) := (others => '0');
+  signal S_AXIS_TLAST   : std_logic                                               := '0';
+  signal S_AXIS_TVALID  : std_logic                                               := '0';
 
   signal img_length_bytes : std_logic_vector(31 downto 0) := (others => '0');
 
   signal img_word_wr_en   : std_logic;
   signal img_word_wr_addr : unsigned(15 downto 0);
-  signal img_word_wr_data : std_logic_vector(C_S_AXIS_TDATA_WIDTH-1 downto 0);
+  signal img_word_wr_data : std_logic_vector(C_S_AXIS_TDATA_WIDTH - 1 downto 0);
   signal img_done         : std_logic;
   signal clear_img_done   : std_logic := '0';
 
@@ -30,24 +30,25 @@ begin
 
   -- DUT instance
   dut : entity work.MNIST_accel_slave_stream_v1_0_S00_AXIS
-    generic map (
+    generic map(
       C_S_AXIS_TDATA_WIDTH => C_S_AXIS_TDATA_WIDTH
     )
-    port map (
-      S_AXIS_ACLK        => S_AXIS_ACLK,
-      S_AXIS_ARESETN     => S_AXIS_ARESETN,
-      S_AXIS_TREADY      => S_AXIS_TREADY,
-      S_AXIS_TDATA       => S_AXIS_TDATA,
-      S_AXIS_TSTRB       => S_AXIS_TSTRB,
-      S_AXIS_TLAST       => S_AXIS_TLAST,
-      S_AXIS_TVALID      => S_AXIS_TVALID,
+    port map
+    (
+      S_AXIS_ACLK    => S_AXIS_ACLK,
+      S_AXIS_ARESETN => S_AXIS_ARESETN,
+      S_AXIS_TREADY  => S_AXIS_TREADY,
+      S_AXIS_TDATA   => S_AXIS_TDATA,
+      S_AXIS_TSTRB   => S_AXIS_TSTRB,
+      S_AXIS_TLAST   => S_AXIS_TLAST,
+      S_AXIS_TVALID  => S_AXIS_TVALID,
 
-      img_length_bytes   => img_length_bytes,
-      img_word_wr_en     => img_word_wr_en,
-      img_word_wr_addr   => img_word_wr_addr,
-      img_word_wr_data   => img_word_wr_data,
-      img_done           => img_done,
-      clear_img_done     => clear_img_done
+      img_length_bytes => img_length_bytes,
+      img_word_wr_en   => img_word_wr_en,
+      img_word_wr_addr => img_word_wr_addr,
+      img_word_wr_data => img_word_wr_data,
+      img_done         => img_done,
+      clear_img_done   => clear_img_done
     );
 
   -- Clock generation
@@ -65,14 +66,14 @@ begin
   rst_gen : process
   begin
     S_AXIS_ARESETN <= '0';
-    wait for 5*CLK_PERIOD;
+    wait for 5 * CLK_PERIOD;
     S_AXIS_ARESETN <= '1';
     wait;
   end process rst_gen;
 
   -- AXI-Stream stimulus
   stim_proc : process
-    constant NUM_BEATS      : integer := 196;  -- 784 bytes / 4 bytes per beat
+    constant NUM_BEATS      : integer := 196; -- 784 bytes / 4 bytes per beat
     constant MAX_WAIT_READY : integer := 50;
     constant MAX_WAIT_DONE  : integer := 200;
     variable beat           : integer;
@@ -86,7 +87,7 @@ begin
     img_length_bytes <= std_logic_vector(to_unsigned(784, img_length_bytes'length));
 
     -- Small delay to let DUT enter RX_IDLE
-    wait for 5*CLK_PERIOD;
+    wait for 5 * CLK_PERIOD;
 
     -- Initialize stream signals
     S_AXIS_TVALID <= '0';
@@ -95,11 +96,11 @@ begin
     S_AXIS_TDATA  <= (others => '0');
 
     -- Send 196 beats
-    for beat in 0 to NUM_BEATS-1 loop
+    for beat in 0 to NUM_BEATS - 1 loop
       S_AXIS_TDATA <= std_logic_vector(to_unsigned(beat, C_S_AXIS_TDATA_WIDTH));
       S_AXIS_TSTRB <= (S_AXIS_TSTRB'range => '1');
 
-      if beat = NUM_BEATS-1 then
+      if beat = NUM_BEATS - 1 then
         S_AXIS_TLAST <= '1';
       else
         S_AXIS_TLAST <= '0';
@@ -149,7 +150,7 @@ begin
 
     -- Optional check on TREADY state after done
     assert S_AXIS_TREADY = '0'
-      report "S_AXIS_TREADY should be '0' after img_done (RX_WAIT_CLEAR)"
+    report "S_AXIS_TREADY should be '0' after img_done (RX_WAIT_CLEAR)"
       severity error;
 
     -- Clear img_done and check re-arm
@@ -178,7 +179,7 @@ begin
     end loop;
 
     report "AXI-Stream slave interface test completed successfully" severity note;
-    wait for 10*CLK_PERIOD;
+    wait for 10 * CLK_PERIOD;
     assert false report "End of simulation" severity failure;
   end process stim_proc;
 
