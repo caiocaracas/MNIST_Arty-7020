@@ -108,9 +108,7 @@ begin
     wait;
   end process rst_gen;
 
-  -----------------------------------------------------------------------------
   -- Simple AXI4-Lite BFM: write/read procedures + stimulus
-  -----------------------------------------------------------------------------
   axi_bfm : process
 
     -- AXI4-Lite write transaction
@@ -180,15 +178,11 @@ begin
     variable rd_data : std_logic_vector(C_S_AXI_DATA_WIDTH-1 downto 0);
 
   begin
-    ---------------------------------------------------------------------------
     -- Wait for reset deassertion
-    ---------------------------------------------------------------------------
     wait until s_axi_aresetn = '1';
     wait until rising_edge(s_axi_aclk);
 
-    ---------------------------------------------------------------------------
     -- 1) Write IMG_LENGTH = 784 (0x00000310) and check output
-    ---------------------------------------------------------------------------
     axi_write_reg(
       ADDR_IMG_LEN,
       std_logic_vector(to_unsigned(784, C_S_AXI_DATA_WIDTH))
@@ -200,9 +194,7 @@ begin
       report "IMG_LENGTH register did not latch expected value 784"
       severity error;
 
-    ---------------------------------------------------------------------------
     -- 2) Write CTRL: set START=1, IRQ_EN=1 and check IRQ_EN latch
-    ---------------------------------------------------------------------------
     -- First clear CTRL
     axi_write_reg(
       ADDR_CTRL,
@@ -223,9 +215,7 @@ begin
       report "ctrl_irq_en did not latch to '1' after CTRL write with IRQ_EN=1"
       severity error;
 
-    ---------------------------------------------------------------------------
     -- 3) Exercise STATUS: busy/done/error -> readback at 0x04
-    ---------------------------------------------------------------------------
     -- Scenario A: busy = 1, done = 0, error = 0
     status_busy  <= '1';
     status_done  <= '0';
@@ -248,9 +238,7 @@ begin
       report "STATUS readback mismatch for busy=0, done=1, error=1"
       severity error;
 
-    ---------------------------------------------------------------------------
     -- End of simulation
-    ---------------------------------------------------------------------------
     report "AXI-Lite control interface test completed successfully" severity note;
     wait for 10*CLK_PERIOD;
     assert false report "End of simulation" severity failure;

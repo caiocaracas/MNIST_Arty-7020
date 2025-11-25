@@ -1,7 +1,13 @@
 v 4
+file . "tb_mnist_accel_slave_stream.vhd" "58c7859239453a3744f8c8c1a5486784861188c9" "20251125042816.313":
+  entity tb_mnist_accel_slave_stream at 1( 0) + 0 on 55;
+  architecture sim of tb_mnist_accel_slave_stream at 8( 149) + 0 on 56;
 file . "tb_mnist_accel_axi_lite.vhd" "0bdb86e2829a755a1f01f61fd1ffac64ddb906c4" "20251125034449.430":
   entity tb_mnist_accel_axi_lite at 1( 0) + 0 on 31;
   architecture sim of tb_mnist_accel_axi_lite at 8( 141) + 0 on 32;
 file . "MNIST_accel_slave_lite_v1_0_S00_AXI.vhd" "b65d453726d2a63d189ceb932a543aa93b54eea8" "20251125034444.072":
   entity mnist_accel_slave_lite_v1_0_s00_axi at 1( 0) + 0 on 29;
   architecture arch_imp of mnist_accel_slave_lite_v1_0_s00_axi at 71( 2508) + 0 on 30;
+file . "MNIST_accel_slave_stream_v1_0_S00_AXIS.vhd" "e3c95212525a0f4bf66f83d916d65e4cf78de5f4" "20251125042816.259":
+  entity mnist_accel_slave_stream_v1_0_s00_axis at 1( 0) + 0 on 53;
+  architecture arch_imp of mnist_accel_slave_stream_v1_0_s00_axis at 36( 1274) + 0 on 54;
