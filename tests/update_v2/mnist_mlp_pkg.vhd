@@ -129,3 +129,79 @@ package mnist_mlp_pkg is
     ) return int8_t;
 
 end package mnist_mlp_pkg;
+
+package body mnist_mlp_pkg is
+
+    -- Ceiling log2
+    function clog2 (
+        n : integer
+    ) return integer is
+        variable r : integer := 0;
+        variable v : integer := n - 1;
+    begin
+        while v > 0 loop
+            v := v / 2;
+            r := r + 1;
+        end loop;
+        return r;
+    end function;
+
+    -- Weight address mapping for each layer (block-based)
+    function weight_addr_l1 (
+        neuron_idx : integer;
+        block_idx  : integer
+    ) return unsigned is
+        variable lin : integer;
+    begin
+        lin := neuron_idx * L1_IN_BLOCKS + block_idx;
+        return resize(to_unsigned(lin, W1_ADDR_WIDTH), W1_ADDR_WIDTH);
+    end function;
+
+    function weight_addr_l2 (
+        neuron_idx : integer;
+        block_idx  : integer
+    ) return unsigned is
+        variable lin : integer;
+    begin
+        lin := neuron_idx * L2_IN_BLOCKS + block_idx;
+        return resize(to_unsigned(lin, W2_ADDR_WIDTH), W2_ADDR_WIDTH);
+    end function;
+
+    function weight_addr_l3 (
+        neuron_idx : integer;
+        block_idx  : integer
+    ) return unsigned is
+        variable lin : integer;
+    begin
+        lin := neuron_idx * L3_IN_BLOCKS + block_idx;
+        return resize(to_unsigned(lin, W3_ADDR_WIDTH), W3_ADDR_WIDTH);
+    end function;
+
+    function weight_addr_l4 (
+        neuron_idx : integer;
+        block_idx  : integer
+    ) return unsigned is
+        variable lin : integer;
+    begin
+        lin := neuron_idx * L4_IN_BLOCKS + block_idx;
+        return resize(to_unsigned(lin, W4_ADDR_WIDTH), W4_ADDR_WIDTH);
+    end function;
+
+    -- Saturate int32_t to int8_t: clip to [-128, 127]
+    function sat_int8 (
+        x : int32_t
+    ) return int8_t is
+        variable y : int8_t;
+    begin
+        if x > to_signed(127, x'length) then
+            y := to_signed(127, 8);
+        elsif x < to_signed(-128, x'length) then
+            y := to_signed(-128, 8);
+        else
+            y := resize(x, 8);
+        end if;
+        return y;
+    end function;
+
+end package body mnist_mlp_pkg;
+
