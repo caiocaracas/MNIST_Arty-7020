@@ -1,7 +1,4 @@
--- File: mnist_mlp_pkg.vhd
 -- Global types and parameters for MNIST MLP INT8 accelerator
--- with input parallelism (N_PAR MACs per cycle).
-
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
