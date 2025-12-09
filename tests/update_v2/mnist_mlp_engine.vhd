@@ -14,7 +14,7 @@ entity mnist_mlp_engine is
         done_o  : out std_logic;
         error_o : out std_logic;
 
-        -- Input image 
+        -- Input image
         image_in   : in  int8_vector_t(0 to L0_SIZE-1);
 
         -- Output logits
@@ -58,7 +58,6 @@ end entity mnist_mlp_engine;
 
 architecture rtl of mnist_mlp_engine is
 
-    -- FSM states
     type state_t is (
         S_IDLE,
         S_L1_INIT,  S_L1_ACCUM,  S_L1_QUANT,
@@ -71,18 +70,18 @@ architecture rtl of mnist_mlp_engine is
 
     signal state_reg, state_next : state_t;
 
-    -- Layer indices (neuron and block per layer)
-    signal l1_neuron_idx : integer range 0 to L1_OUT_SIZE := 0;
-    signal l1_block_idx  : integer range 0 to L1_IN_BLOCKS := 0;
+    -- Indices (0 .. OUT_SIZE-1 / 0 .. IN_BLOCKS-1)
+    signal l1_neuron_idx : integer range 0 to L1_OUT_SIZE-1 := 0;
+    signal l1_block_idx  : integer range 0 to L1_IN_BLOCKS-1 := 0;
 
-    signal l2_neuron_idx : integer range 0 to L2_OUT_SIZE := 0;
-    signal l2_block_idx  : integer range 0 to L2_IN_BLOCKS := 0;
+    signal l2_neuron_idx : integer range 0 to L2_OUT_SIZE-1 := 0;
+    signal l2_block_idx  : integer range 0 to L2_IN_BLOCKS-1 := 0;
 
-    signal l3_neuron_idx : integer range 0 to L3_OUT_SIZE := 0;
-    signal l3_block_idx  : integer range 0 to L3_IN_BLOCKS := 0;
+    signal l3_neuron_idx : integer range 0 to L3_OUT_SIZE-1 := 0;
+    signal l3_block_idx  : integer range 0 to L3_IN_BLOCKS-1 := 0;
 
-    signal l4_neuron_idx : integer range 0 to L4_OUT_SIZE := 0;
-    signal l4_block_idx  : integer range 0 to L4_IN_BLOCKS := 0;
+    signal l4_neuron_idx : integer range 0 to L4_OUT_SIZE-1 := 0;
+    signal l4_block_idx  : integer range 0 to L4_IN_BLOCKS-1 := 0;
 
     -- Accumulator
     signal acc_reg : int32_t := (others => '0');
@@ -105,7 +104,6 @@ begin
     error_o   <= error_reg;
     logits_out <= act_l4;
 
-    -- State register
     process (clk, rst_n)
     begin
         if rst_n = '0' then
@@ -115,7 +113,8 @@ begin
         end if;
     end process;
 
-    process (state_reg, start_i,
+    process (state_reg,
+             start_i,
              l1_neuron_idx, l1_block_idx,
              l2_neuron_idx, l2_block_idx,
              l3_neuron_idx, l3_block_idx,
@@ -135,7 +134,7 @@ begin
                 state_next <= S_L1_ACCUM;
 
             when S_L1_ACCUM =>
-                if l1_block_idx = L1_IN_BLOCKS then
+                if l1_block_idx = L1_IN_BLOCKS-1 then
                     state_next <= S_L1_QUANT;
                 end if;
 
@@ -151,7 +150,7 @@ begin
                 state_next <= S_L2_ACCUM;
 
             when S_L2_ACCUM =>
-                if l2_block_idx = L2_IN_BLOCKS then
+                if l2_block_idx = L2_IN_BLOCKS-1 then
                     state_next <= S_L2_QUANT;
                 end if;
 
@@ -167,7 +166,7 @@ begin
                 state_next <= S_L3_ACCUM;
 
             when S_L3_ACCUM =>
-                if l3_block_idx = L3_IN_BLOCKS then
+                if l3_block_idx = L3_IN_BLOCKS-1 then
                     state_next <= S_L3_QUANT;
                 end if;
 
@@ -183,7 +182,7 @@ begin
                 state_next <= S_L4_ACCUM;
 
             when S_L4_ACCUM =>
-                if l4_block_idx = L4_IN_BLOCKS then
+                if l4_block_idx = L4_IN_BLOCKS-1 then
                     state_next <= S_L4_QUANT;
                 end if;
 
@@ -207,17 +206,18 @@ begin
     end process;
 
     process (clk, rst_n)
-        variable prod_vec : int32_vector_t(0 to N_PAR-1);
-        variable sum_block : int32_t;
-        variable q_acc      : int32_t;
-        variable act_val    : int8_t;
-        variable k          : integer;
+        variable mul      : int16_t;
+        variable sum_block: int32_t;
+        variable q_acc    : int32_t;
+        variable act_val  : int8_t;
+        variable k        : integer;
     begin
         if rst_n = '0' then
             busy_reg   <= '0';
             done_reg   <= '0';
             error_reg  <= '0';
             acc_reg    <= (others => '0');
+
             l1_neuron_idx <= 0;
             l1_block_idx  <= 0;
             l2_neuron_idx <= 0;
@@ -226,18 +226,21 @@ begin
             l3_block_idx  <= 0;
             l4_neuron_idx <= 0;
             l4_block_idx  <= 0;
-            act_l1        <= (others => to_signed(0,8));
-            act_l2        <= (others => to_signed(0,8));
-            act_l3        <= (others => to_signed(0,8));
-            act_l4        <= (others => to_signed(0,8));
-            w1_addr       <= (others => '0');
-            w2_addr       <= (others => '0');
-            w3_addr       <= (others => '0');
-            w4_addr       <= (others => '0');
-            b1_addr       <= (others => '0');
-            b2_addr       <= (others => '0');
-            b3_addr       <= (others => '0');
-            b4_addr       <= (others => '0');
+
+            act_l1 <= (others => to_signed(0,8));
+            act_l2 <= (others => to_signed(0,8));
+            act_l3 <= (others => to_signed(0,8));
+            act_l4 <= (others => to_signed(0,8));
+
+            w1_addr <= (others => '0');
+            w2_addr <= (others => '0');
+            w3_addr <= (others => '0');
+            w4_addr <= (others => '0');
+            b1_addr <= (others => '0');
+            b2_addr <= (others => '0');
+            b3_addr <= (others => '0');
+            b4_addr <= (others => '0');
+
         elsif rising_edge(clk) then
 
             done_reg <= '0';
@@ -252,76 +255,60 @@ begin
                         busy_reg      <= '1';
                         l1_neuron_idx <= 0;
                         l1_block_idx  <= 0;
-                        -- Set initial bias address for L1
-                        b1_addr <= std_logic_vector(to_unsigned(0, B1_ADDR_WIDTH));
-                        -- Weight address for first neuron/block
+                        b1_addr <= to_unsigned(0, B1_ADDR_WIDTH);
                         w1_addr <= weight_addr_l1(0, 0);
                     end if;
 
                 -- Layer 1
                 when S_L1_INIT =>
-                    -- Initialize accumulator with bias for current neuron
-                    b1_addr <= std_logic_vector(to_unsigned(l1_neuron_idx, B1_ADDR_WIDTH));
+                    b1_addr <= to_unsigned(l1_neuron_idx, B1_ADDR_WIDTH);
                     acc_reg <= b1_dout;
-                    -- Start from first block
                     l1_block_idx <= 0;
                     w1_addr <= weight_addr_l1(l1_neuron_idx, 0);
 
                 when S_L1_ACCUM =>
-                    -- Compute N_PAR MACs for this block
                     sum_block := (others => '0');
 
                     for i in 0 to N_PAR-1 loop
-                        -- Global input index for this block position
                         k := l1_block_idx * N_PAR + i;
-
                         if k < L1_IN_SIZE then
                             act_val := image_in(k);
-                            prod_vec(i) :=
-                                resize(w1_dout(i), 32) * resize(act_val, 32);
-                        else
-                            prod_vec(i) := (others => '0');
+                            -- 8x8 signed multiply -> 16 bits, DSP-friendly
+                            mul := image_in(k) * w1_dout(i);
+                            sum_block := sum_block + resize(mul, sum_block'length);
                         end if;
-
-                        sum_block := sum_block + prod_vec(i);
                     end loop;
 
                     acc_reg <= acc_reg + sum_block;
 
-                    -- Next block
-                    if l1_block_idx < L1_IN_BLOCKS then
+                    if l1_block_idx < L1_IN_BLOCKS-1 then
                         l1_block_idx <= l1_block_idx + 1;
                         w1_addr <= weight_addr_l1(l1_neuron_idx, l1_block_idx + 1);
                     end if;
 
                 when S_L1_QUANT =>
-                    -- Quantize acc_reg using QPARAMS(1)
                     q_acc := acc_reg * QPARAMS(1).M;
-
                     if QPARAMS(1).shift > 0 then
                         q_acc := shift_right(q_acc, QPARAMS(1).shift);
                     end if;
-
                     q_acc := q_acc + resize(QPARAMS(1).zp_out, 32);
 
                     act_l1(l1_neuron_idx) <= sat_int8(q_acc);
 
-                    -- Next neuron
                     if l1_neuron_idx < L1_OUT_SIZE-1 then
                         l1_neuron_idx <= l1_neuron_idx + 1;
                         l1_block_idx  <= 0;
                         acc_reg       <= (others => '0');
-                        b1_addr       <= std_logic_vector(to_unsigned(l1_neuron_idx+1, B1_ADDR_WIDTH));
-                        w1_addr       <= weight_addr_l1(l1_neuron_idx+1, 0);
+                        b1_addr       <= to_unsigned(l1_neuron_idx + 1, B1_ADDR_WIDTH);
+                        w1_addr       <= weight_addr_l1(l1_neuron_idx + 1, 0);
                     else
-                        -- Prepare for layer 2
                         l2_neuron_idx <= 0;
                         l2_block_idx  <= 0;
                     end if;
 
                 -- Layer 2
                 when S_L2_INIT =>
-                    b2_addr <= std_logic_vector(to_unsigned(l2_neuron_idx, B2_ADDR_WIDTH));
+                    b2_addr <= to_unsigned(l2_neuron_idx, B2_ADDR_WIDTH);
                     acc_reg <= b2_dout;
                     l2_block_idx <= 0;
                     w2_addr <= weight_addr_l2(l2_neuron_idx, 0);
@@ -333,28 +320,23 @@ begin
                         k := l2_block_idx * N_PAR + i;
                         if k < L2_IN_SIZE then
                             act_val := act_l1(k);
-                            prod_vec(i) :=
-                                resize(w2_dout(i), 32) * resize(act_val, 32);
-                        else
-                            prod_vec(i) := (others => '0');
+                            mul := act_l1(k) * w2_dout(i);
+                            sum_block := sum_block + resize(mul, sum_block'length);
                         end if;
-                        sum_block := sum_block + prod_vec(i);
                     end loop;
 
                     acc_reg <= acc_reg + sum_block;
 
-                    if l2_block_idx < L2_IN_BLOCKS then
+                    if l2_block_idx < L2_IN_BLOCKS-1 then
                         l2_block_idx <= l2_block_idx + 1;
                         w2_addr <= weight_addr_l2(l2_neuron_idx, l2_block_idx + 1);
                     end if;
 
                 when S_L2_QUANT =>
                     q_acc := acc_reg * QPARAMS(2).M;
-
                     if QPARAMS(2).shift > 0 then
                         q_acc := shift_right(q_acc, QPARAMS(2).shift);
                     end if;
-
                     q_acc := q_acc + resize(QPARAMS(2).zp_out, 32);
 
                     act_l2(l2_neuron_idx) <= sat_int8(q_acc);
@@ -363,8 +345,8 @@ begin
                         l2_neuron_idx <= l2_neuron_idx + 1;
                         l2_block_idx  <= 0;
                         acc_reg       <= (others => '0');
-                        b2_addr       <= std_logic_vector(to_unsigned(l2_neuron_idx+1, B2_ADDR_WIDTH));
-                        w2_addr       <= weight_addr_l2(l2_neuron_idx+1, 0);
+                        b2_addr       <= to_unsigned(l2_neuron_idx + 1, B2_ADDR_WIDTH);
+                        w2_addr       <= weight_addr_l2(l2_neuron_idx + 1, 0);
                     else
                         l3_neuron_idx <= 0;
                         l3_block_idx  <= 0;
@@ -372,7 +354,7 @@ begin
 
                 -- Layer 3
                 when S_L3_INIT =>
-                    b3_addr <= std_logic_vector(to_unsigned(l3_neuron_idx, B3_ADDR_WIDTH));
+                    b3_addr <= to_unsigned(l3_neuron_idx, B3_ADDR_WIDTH);
                     acc_reg <= b3_dout;
                     l3_block_idx <= 0;
                     w3_addr <= weight_addr_l3(l3_neuron_idx, 0);
@@ -384,28 +366,23 @@ begin
                         k := l3_block_idx * N_PAR + i;
                         if k < L3_IN_SIZE then
                             act_val := act_l2(k);
-                            prod_vec(i) :=
-                                resize(w3_dout(i), 32) * resize(act_val, 32);
-                        else
-                            prod_vec(i) := (others => '0');
+                            mul := act_l2(k) * w3_dout(i);
+                            sum_block := sum_block + resize(mul, sum_block'length);
                         end if;
-                        sum_block := sum_block + prod_vec(i);
                     end loop;
 
                     acc_reg <= acc_reg + sum_block;
 
-                    if l3_block_idx < L3_IN_BLOCKS then
+                    if l3_block_idx < L3_IN_BLOCKS-1 then
                         l3_block_idx <= l3_block_idx + 1;
                         w3_addr <= weight_addr_l3(l3_neuron_idx, l3_block_idx + 1);
                     end if;
 
                 when S_L3_QUANT =>
                     q_acc := acc_reg * QPARAMS(3).M;
-
                     if QPARAMS(3).shift > 0 then
                         q_acc := shift_right(q_acc, QPARAMS(3).shift);
                     end if;
-
                     q_acc := q_acc + resize(QPARAMS(3).zp_out, 32);
 
                     act_l3(l3_neuron_idx) <= sat_int8(q_acc);
@@ -414,8 +391,8 @@ begin
                         l3_neuron_idx <= l3_neuron_idx + 1;
                         l3_block_idx  <= 0;
                         acc_reg       <= (others => '0');
-                        b3_addr       <= std_logic_vector(to_unsigned(l3_neuron_idx+1, B3_ADDR_WIDTH));
-                        w3_addr       <= weight_addr_l3(l3_neuron_idx+1, 0);
+                        b3_addr       <= to_unsigned(l3_neuron_idx + 1, B3_ADDR_WIDTH);
+                        w3_addr       <= weight_addr_l3(l3_neuron_idx + 1, 0);
                     else
                         l4_neuron_idx <= 0;
                         l4_block_idx  <= 0;
@@ -423,7 +400,7 @@ begin
 
                 -- Layer 4
                 when S_L4_INIT =>
-                    b4_addr <= std_logic_vector(to_unsigned(l4_neuron_idx, B4_ADDR_WIDTH));
+                    b4_addr <= to_unsigned(l4_neuron_idx, B4_ADDR_WIDTH);
                     acc_reg <= b4_dout;
                     l4_block_idx <= 0;
                     w4_addr <= weight_addr_l4(l4_neuron_idx, 0);
@@ -435,28 +412,23 @@ begin
                         k := l4_block_idx * N_PAR + i;
                         if k < L4_IN_SIZE then
                             act_val := act_l3(k);
-                            prod_vec(i) :=
-                                resize(w4_dout(i), 32) * resize(act_val, 32);
-                        else
-                            prod_vec(i) := (others => '0');
+                            mul := act_l3(k) * w4_dout(i);
+                            sum_block := sum_block + resize(mul, sum_block'length);
                         end if;
-                        sum_block := sum_block + prod_vec(i);
                     end loop;
 
                     acc_reg <= acc_reg + sum_block;
 
-                    if l4_block_idx < L4_IN_BLOCKS then
+                    if l4_block_idx < L4_IN_BLOCKS-1 then
                         l4_block_idx <= l4_block_idx + 1;
                         w4_addr <= weight_addr_l4(l4_neuron_idx, l4_block_idx + 1);
                     end if;
 
                 when S_L4_QUANT =>
                     q_acc := acc_reg * QPARAMS(4).M;
-
                     if QPARAMS(4).shift > 0 then
                         q_acc := shift_right(q_acc, QPARAMS(4).shift);
                     end if;
-
                     q_acc := q_acc + resize(QPARAMS(4).zp_out, 32);
 
                     act_l4(l4_neuron_idx) <= sat_int8(q_acc);
@@ -465,8 +437,8 @@ begin
                         l4_neuron_idx <= l4_neuron_idx + 1;
                         l4_block_idx  <= 0;
                         acc_reg       <= (others => '0');
-                        b4_addr       <= std_logic_vector(to_unsigned(l4_neuron_idx+1, B4_ADDR_WIDTH));
-                        w4_addr       <= weight_addr_l4(l4_neuron_idx+1, 0);
+                        b4_addr       <= to_unsigned(l4_neuron_idx + 1, B4_ADDR_WIDTH);
+                        w4_addr       <= weight_addr_l4(l4_neuron_idx + 1, 0);
                     end if;
 
                 -- DONE / ERROR

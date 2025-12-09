@@ -6,6 +6,7 @@ use ieee.numeric_std.all;
 package mnist_mlp_pkg is
     -- Numeric base types
     subtype int8_t  is signed(7 downto 0);    -- 8-bit signed
+    subtype int16_t is signed(15 downto 0);   -- 16-bit signed for DSP multiplies
     subtype int32_t is signed(31 downto 0);   -- 32-bit signed
 
     type int8_vector_t  is array (natural range <>) of int8_t;
