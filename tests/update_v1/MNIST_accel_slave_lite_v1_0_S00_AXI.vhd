@@ -116,9 +116,7 @@ architecture arch_imp of MNIST_accel_slave_lite_v1_0_S00_AXI is
 
 begin
 
-  -----------------------------------------------------------------------------
   -- AXI4-Lite interface assignments
-  -----------------------------------------------------------------------------
   S_AXI_AWREADY <= axi_awready;
   S_AXI_WREADY  <= axi_wready;
   S_AXI_BRESP   <= axi_bresp;
@@ -145,9 +143,7 @@ begin
     )
     );
 
-  -----------------------------------------------------------------------------
   -- Write address channel
-  -----------------------------------------------------------------------------
   process (S_AXI_ACLK)
   begin
     if rising_edge(S_AXI_ACLK) then
@@ -165,9 +161,7 @@ begin
     end if;
   end process;
 
-  -----------------------------------------------------------------------------
   -- Write data channel
-  -----------------------------------------------------------------------------
   process (S_AXI_ACLK)
   begin
     if rising_edge(S_AXI_ACLK) then
@@ -183,9 +177,7 @@ begin
     end if;
   end process;
 
-  -----------------------------------------------------------------------------
   -- Write response channel
-  -----------------------------------------------------------------------------
   process (S_AXI_ACLK)
   begin
     if rising_edge(S_AXI_ACLK) then
@@ -211,9 +203,7 @@ begin
     else
     '0';
 
-  -----------------------------------------------------------------------------
   -- Read address channel
-  -----------------------------------------------------------------------------
   process (S_AXI_ACLK)
   begin
     if rising_edge(S_AXI_ACLK) then
@@ -237,9 +227,7 @@ begin
     else
     '0';
 
-  -----------------------------------------------------------------------------
   -- Read data channel
-  -----------------------------------------------------------------------------
   process (S_AXI_ACLK)
   begin
     if rising_edge(S_AXI_ACLK) then
@@ -257,9 +245,7 @@ begin
     end if;
   end process;
 
-  -----------------------------------------------------------------------------
   -- Register write logic (CTRL, IMG_LENGTH, IRQ_EN, START pulse)
-  -----------------------------------------------------------------------------
   process (S_AXI_ACLK)
   begin
     if rising_edge(S_AXI_ACLK) then
@@ -306,9 +292,7 @@ begin
     end if;
   end process;
 
-  -----------------------------------------------------------------------------
   -- START pulse generation (one cycle)
-  -----------------------------------------------------------------------------
   process (S_AXI_ACLK)
   begin
     if rising_edge(S_AXI_ACLK) then
@@ -328,9 +312,7 @@ begin
     end if;
   end process;
 
-  -----------------------------------------------------------------------------
   -- Read data mux (CTRL, STATUS, IMG_LENGTH)
-  -----------------------------------------------------------------------------
   -- STATUS is read-only and driven from top-level:
   -- bit 0: DONE
   -- bit 1: BUSY

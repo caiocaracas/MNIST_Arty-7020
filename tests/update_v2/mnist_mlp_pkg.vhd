@@ -4,7 +4,7 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
 package mnist_mlp_pkg is
-
+    -- Numeric base types
     subtype int8_t  is signed(7 downto 0);    -- 8-bit signed
     subtype int32_t is signed(31 downto 0);   -- 32-bit signed
 
@@ -19,11 +19,11 @@ package mnist_mlp_pkg is
     --  - L3_SIZE (64)
     constant N_PAR : integer := 8;
 
-    constant L0_SIZE : integer := 784;  -- input layer 
+    constant L0_SIZE : integer := 784;  -- input layer
     constant L1_SIZE : integer := 256;  -- hidden layer 1
     constant L2_SIZE : integer := 128;  -- hidden layer 2
     constant L3_SIZE : integer := 64;   -- hidden layer 3
-    constant L4_SIZE : integer := 10;   -- output layer 
+    constant L4_SIZE : integer := 10;   -- output layer
 
     -- Convenience aliases for layer input/output sizes
     constant L1_IN_SIZE  : integer := L0_SIZE;
@@ -39,6 +39,7 @@ package mnist_mlp_pkg is
     constant L4_OUT_SIZE : integer := L4_SIZE;
 
     -- Input blocks per layer (each block has N_PAR inputs)
+    -- These must be integers; N_PAR must divide each IN_SIZE.
     constant L1_IN_BLOCKS : integer := L1_IN_SIZE / N_PAR;
     constant L2_IN_BLOCKS : integer := L2_IN_SIZE / N_PAR;
     constant L3_IN_BLOCKS : integer := L3_IN_SIZE / N_PAR;
@@ -88,7 +89,7 @@ package mnist_mlp_pkg is
 
     type qparams_array_t is array (1 to 4) of layer_qparams_t;
 
-    -- Default stub values. This constant is expected to be auto-generated from the Python quantization script
+    -- Default stub values. This constant is expected to be auto-generated from the Python quantization script.
     constant QPARAMS : qparams_array_t := (
         1 => (M => to_signed(1,32), shift => 0, zp_out => to_signed(0,8)), -- L1
         2 => (M => to_signed(1,32), shift => 0, zp_out => to_signed(0,8)), -- L2
@@ -99,6 +100,7 @@ package mnist_mlp_pkg is
     -- Helper functions: weight address mapping (block-based)
     -- For each layer: (neuron_idx, block_idx) -> ROM word address.
     -- Each block corresponds to N_PAR consecutive input indices.
+    --
     -- addr = neuron_idx * IN_BLOCKS + block_idx
     function weight_addr_l1 (
         neuron_idx : integer;
@@ -136,6 +138,7 @@ package body mnist_mlp_pkg is
         variable r : integer := 0;
         variable v : integer := n - 1;
     begin
+        -- Simple iterative implementation; synthesizable.
         while v > 0 loop
             v := v / 2;
             r := r + 1;
@@ -199,6 +202,4 @@ package body mnist_mlp_pkg is
         end if;
         return y;
     end function;
-
 end package body mnist_mlp_pkg;
-
