@@ -1,12 +1,13 @@
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
+use std.textio.all;
 
 use work.mnist_mlp_pkg.all;
 
 entity bias_rom is
     generic (
-        INIT_FILE  : string;          -- "b1.mem"
+        INIT_FILE  : string;
         WORD_COUNT : integer;
         ADDR_WIDTH : integer
     );
@@ -15,34 +16,47 @@ entity bias_rom is
         addr : in  unsigned(ADDR_WIDTH-1 downto 0);
         dout : out int32_t
     );
-end entity;
+end entity bias_rom;
 
 architecture rtl of bias_rom is
 
-    -- Memory definition (signed 32-bit bias per entry)
-    type mem_t is array (0 to WORD_COUNT-1) of int32_t;
+    constant DATA_WIDTH : integer := 32;
 
-    signal mem : mem_t := (others => (others => '0'));
+    type ram_t is array (0 to WORD_COUNT-1) of std_logic_vector(DATA_WIDTH-1 downto 0);
 
-    -- Attributes for BRAM + initialization
+    impure function init_ram_from_file (
+        file_name : in string
+    ) return ram_t is
+        file     f        : text open read_mode is file_name;
+        variable line_buf : line;
+        variable tmp      : bit_vector(DATA_WIDTH-1 downto 0);
+        variable ram_v    : ram_t := (others => (others => '0'));
+    begin
+        for i in ram_t'range loop
+            exit when endfile(f);
+            readline(f, line_buf);
+            read(line_buf, tmp);
+            ram_v(i) := to_stdlogicvector(tmp); 
+        end loop;
+        return ram_v;
+    end function;
+
+    signal mem : ram_t := init_ram_from_file(INIT_FILE);
+
     attribute ram_style : string;
     attribute ram_style of mem : signal is "block";
 
-    attribute ram_init_file : string;
-    attribute ram_init_file of mem : signal is INIT_FILE;
-
-    signal dout_reg : int32_t := (others => '0');
+    signal dout_raw : std_logic_vector(DATA_WIDTH-1 downto 0);
 
 begin
 
-    -- Synchronous read (BRAM)
-    process(clk)
+    process (clk)
     begin
         if rising_edge(clk) then
-            dout_reg <= mem(to_integer(addr));
+            dout_raw <= mem(to_integer(addr));
         end if;
     end process;
 
-    dout <= dout_reg;
+    dout <= signed(dout_raw);
 
-end architecture;
+end architecture rtl;
