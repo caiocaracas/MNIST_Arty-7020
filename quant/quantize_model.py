@@ -1,347 +1,287 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""Quantize FP32 MNIST MLP to INT8 and export weights + spec.
-
-- Loads FP32 model and activation stats.
-- Computes activation scales/zero-points (INT8).
-- Quantizes weights (INT8) and biases (INT32).
-- Computes per-layer requantization multipliers (M, shift).
-- Writes binary weight/bias files and int8_spec.json.
-"""
-
-
-from __future__ import annotations
 
 import argparse
 import json
-import math
-import random
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Tuple
+from dataclasses import dataclass, asdict
+from typing import Dict, List, Tuple
 
 import numpy as np
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
+from torch import nn
+
+
+# Config structures
 
 @dataclass
-class Config:
-  """Configuration for INT8 quantization."""
-
-  artifacts_dir: str = "./artifacts"
-  seed: int = 42
-  num_bits_activation: int = 8
-  num_bits_weight: int = 8
-
-
-class MLP_MNIST(nn.Module):
-  """MLP: 784 → 256 → 128 → 64 → 10."""
-
-  def __init__(self) -> None:
-    super().__init__()
-    self.fc1 = nn.Linear(784, 256)
-    self.fc2 = nn.Linear(256, 128)
-    self.fc3 = nn.Linear(128, 64)
-    self.fc4 = nn.Linear(64, 10)
-
-  def forward(self, x: torch.Tensor) -> torch.Tensor:
-    x = x.view(x.size(0), -1)
-    x = F.relu(self.fc1(x))
-    x = F.relu(self.fc2(x))
-    x = F.relu(self.fc3(x))
-    x = self.fc4(x)
-    return x
-
-def set_seed(seed: int) -> None:
-  """Configure deterministic behavior for reproducibility."""
-  random.seed(seed)
-  np.random.seed(seed)
-  torch.manual_seed(seed)
-  torch.cuda.manual_seed_all(seed)
-  torch.backends.cudnn.deterministic = True
-  torch.backends.cudnn.benchmark = False
+class LayerQuantSpec:
+    name: str
+    in_size: int
+    out_size: int
+    act_in_scale: float
+    act_in_zp: int
+    act_out_scale: float
+    act_out_zp: int
+    weight_scale: float
+    weight_zp: int
+    bias_scale: float
+    requant_M: int
+    requant_shift: int
 
 
-def load_activation_stats(path: Path) -> Dict:
-  """Load activation min/max statistics from JSON."""
-  with path.open("r", encoding="utf-8") as f:
-    return json.load(f)
+@dataclass
+class QuantConfig:
+    model_path: Path
+    output_dir: Path
+    n_par: int = 8
+    num_bits_activation: int = 8
+    num_bits_weight: int = 8
+    seed: int = 42
+    act_stats_path: Path | None = None
 
 
-def calc_activation_qparams(
-  min_val: float,
-  max_val: float,
-  num_bits: int = 8,
-  signed: bool = True,
-) -> Tuple[float, int, int, int]:
-  """Compute scale and zero-point for activation tensor."""
-  if signed:
-    qmin, qmax = -2 ** (num_bits - 1), 2 ** (num_bits - 1) - 1
-  else:
-    qmin, qmax = 0, 2**num_bits - 1
-
-  min_val = float(min_val)
-  max_val = float(max_val)
-
-  if min_val == max_val:
-    if min_val == 0.0:
-      return 1.0, 0, qmin, qmax
-    max_val = min_val + 1e-6
-
-  scale = (max_val - min_val) / float(qmax - qmin)
-  zero_point = round(qmin - min_val / scale)
-  zero_point = int(max(qmin, min(qmax, zero_point)))
-  return float(scale), zero_point, qmin, qmax
-
-def quantize_weights_per_tensor(
-  weight: torch.Tensor, num_bits: int = 8
-) -> Tuple[np.ndarray, float]:
-  """Symmetric per-tensor INT8 quantization for weights."""
-  w = weight.detach().cpu().numpy()
-  max_abs = float(np.max(np.abs(w)))
-  if max_abs == 0.0:
-    scale = 1.0
-    w_int = np.zeros_like(w, dtype=np.int8)
-  else:
-    qmax = 2 ** (num_bits - 1) - 1  # 127
-    scale = max_abs / float(qmax)
-    w_int = np.round(w / scale).astype(np.int8)
-  return w_int, float(scale)
-
-def quantize_bias(
-  bias: torch.Tensor, scale_input: float, scale_weight: float
-) -> np.ndarray:
-  """Quantize bias to INT32 using scale = S_in * S_w."""
-  b = bias.detach().cpu().numpy()
-  scale = scale_input * scale_weight
-  if scale == 0.0:
-      return np.zeros_like(b, dtype=np.int32)
-  b_int = np.round(b / scale).astype(np.int32)
-  return b_int
-
-def quantize_multiplier(real_multiplier: float, max_shift: int = 31) -> Tuple[int, int]:
-  """Approximate real_multiplier with M / 2^shift."""
-  if real_multiplier <= 0.0:
-    return 0, 0
-
-  best_M = 0
-  best_shift = 0
-  min_err = float("inf")
-  max_M = 2**30 - 1
-
-  for shift in range(max_shift + 1):
-    M = int(round(real_multiplier * (1 << shift)))
-    if M == 0 or abs(M) > max_M:
-        continue
-    approx = M / float(1 << shift)
-    err = abs(approx - real_multiplier)
-    if err < min_err:
-        best_M, best_shift, min_err = M, shift, err
-
-  if best_M == 0:
-    best_shift = max_shift
-    best_M = int(max(1, min(max_M, round(real_multiplier * (1 << best_shift)))))
-
-  return int(best_M), int(best_shift)
-
-def save_bin(arr: np.ndarray, path: Path, dtype: np.dtype) -> None:
-  """Save array as raw binary file (C-order flatten)."""
-  path.parent.mkdir(parents=True, exist_ok=True)
-  arr.astype(dtype).ravel().tofile(path)
+LAYER_ORDER = [
+    ("fc1", 784, 256),
+    ("fc2", 256, 128),
+    ("fc3", 128, 64),
+    ("fc4", 64, 10),
+]
 
 
-def quantize_model(cfg: Config) -> None:
-  """Main quantization pipeline."""
-  artifacts_dir = Path(cfg.artifacts_dir)
-  state_dict_path = artifacts_dir / "model_fp32.pth"
-  stats_path = artifacts_dir / "activation_stats.json"
+# Utils
 
-  if not state_dict_path.is_file():
-    raise FileNotFoundError(
-        f"FP32 model not found at {state_dict_path}. Run train_fp32.py first."
-    )
-  if not stats_path.is_file():
-    raise FileNotFoundError(
-        f"Activation stats not found at {stats_path}. Run collect_activation_stats.py first."
+def parse_args() -> QuantConfig:
+    p = argparse.ArgumentParser("Quantize MNIST MLP to INT8")
+    p.add_argument("--model-path", type=Path, required=True)
+    p.add_argument("--output-dir", type=Path, required=True)
+    p.add_argument("--n-par", type=int, default=8)
+    p.add_argument("--act-stats-path", type=Path, default=None)
+    p.add_argument("--seed", type=int, default=42)
+    a = p.parse_args()
+    return QuantConfig(
+        model_path=a.model_path,
+        output_dir=a.output_dir,
+        n_par=a.n_par,
+        act_stats_path=a.act_stats_path,
+        seed=a.seed,
     )
 
-  # Load FP32 model
-  device = torch.device("cpu")
-  model = MLP_MNIST().to(device)
-  state_dict = torch.load(state_dict_path, map_location=device)
-  model.load_state_dict(state_dict)
-  model.eval()
-  print(f"Loaded FP32 model from: {state_dict_path}")
 
-  # Load activation stats
-  stats_raw = load_activation_stats(stats_path)
-  tensor_stats = stats_raw["tensors"]
-
-  # Compute activation quantization parameters (INT8 signed)
-  activation_qparams: Dict[str, Dict] = {}
-  for name, s in tensor_stats.items():
-      scale, zp, qmin, qmax = calc_activation_qparams(
-        s["min_val"], s["max_val"], num_bits=cfg.num_bits_activation, signed=True
-      )
-      activation_qparams[name] = {
-        "scale": scale,
-        "zero_point": zp,
-        "qmin": qmin,
-        "qmax": qmax,
-      }
-
-  # Layer spec: (layer_name, module_attr, in_tensor, out_tensor, has_relu)
-  layers_spec = [
-    ("fc1", "fc1", "fc1_in", "fc1_out", True),
-    ("fc2", "fc2", "fc1_out", "fc2_out", True),
-    ("fc3", "fc3", "fc2_out", "fc3_out", True),
-    ("fc4", "fc4", "fc3_out", "fc4_out", False),  # logits
-  ]
-
-  layers_out = []
-  weights_dir = artifacts_dir / "weights"
-  bias_dir = artifacts_dir / "bias"
-
-  for layer_name, attr, in_tensor_name, out_tensor_name, has_relu in layers_spec:
-    mod: nn.Linear = getattr(model, attr)
-    w_fp = mod.weight        # (out_features, in_features)
-    b_fp = mod.bias          # (out_features,)
-
-    in_q = activation_qparams[in_tensor_name]
-    out_q = activation_qparams[out_tensor_name]
-
-    S_in = in_q["scale"]
-    Z_in = in_q["zero_point"]
-    S_out = out_q["scale"]
-    Z_out = out_q["zero_point"]
-
-    # Quantize weights INT8 sym
-    w_int8, S_w = quantize_weights_per_tensor(
-      w_fp, num_bits=cfg.num_bits_weight
-    )
-
-    # Quantize bias INT32
-    if b_fp is not None:
-      b_int32 = quantize_bias(b_fp, S_in, S_w)
+def load_model_state_dict(path: Path) -> Dict[str, torch.Tensor]:
+    obj = torch.load(path, map_location="cpu")
+    if isinstance(obj, dict) and "state_dict" in obj:
+        sd = obj["state_dict"]
+    elif isinstance(obj, nn.Module):
+        sd = obj.state_dict()
     else:
-      b_int32 = np.zeros(w_int8.shape[0], dtype=np.int32)
+        sd = obj
+    out = {}
+    for k, v in sd.items():
+        k = k.replace("module.", "").replace("model.", "")
+        out[k] = v.detach().cpu().float()
+    return out
 
-    # Requantization multiplier acc_int32 -> output INT8
-    real_multiplier = (S_in * S_w) / S_out
-    M, shift = quantize_multiplier(real_multiplier)
 
-    # File paths (relative in JSON, absolute for saving)
-    w_rel_path = f"weights/{layer_name}_W_int8.bin"
-    b_rel_path = f"bias/{layer_name}_b_int32.bin"
-    w_path = weights_dir / f"{layer_name}_W_int8.bin"
-    b_path = bias_dir / f"{layer_name}_b_int32.bin"
+def load_act_stats(path: Path | None) -> Dict[str, Dict[str, float]]:
+    if path is None:
+        return {}
 
-    save_bin(w_int8, w_path, np.int8)
-    save_bin(b_int32, b_path, np.int32)
+    with path.open() as f:
+        raw = json.load(f)
 
-    print(
-      f"[{layer_name}] "
-      f"S_in={S_in:.6e}, S_w={S_w:.6e}, S_out={S_out:.6e}, "
-      f"real_mult={real_multiplier:.6e}, M={M}, shift={shift}"
-    )
+    tensors = raw.get("tensors", {})
+    out = {}
+    for name, d in tensors.items():
+        out[name] = {
+            "min": float(d.get("min_val")),
+            "max": float(d.get("max_val")),
+        }
+    return out
 
-    layers_out.append(
-      {
-        "name": layer_name,
-        "type": "Linear",
-        "in_features": int(w_int8.shape[1]),
-        "out_features": int(w_int8.shape[0]),
-        "input_activation": in_tensor_name,
-        "output_activation": out_tensor_name,
-        "relu": has_relu,
-        "weight": {
-            "scale": S_w,
-            "zero_point": 0,
-            "file": w_rel_path,
-            "shape": [int(w_int8.shape[0]), int(w_int8.shape[1])],
-            "dtype": "int8",
-        },
-        "bias": {
-            "scale": S_in * S_w,
-            "file": b_rel_path,
-            "dtype": "int32",
-        },
-        "requant": {
-            "real_multiplier": real_multiplier,
-            "M": M,
-            "shift": shift,
-            "output_zero_point": Z_out,
-        },
-      }
-    )
 
-  # Architecture string derivada dos pesos (não hardcoded)
-  arch_str = (
-    f"784-"
-    f"{model.fc1.out_features}-"
-    f"{model.fc2.out_features}-"
-    f"{model.fc3.out_features}-"
-    f"{model.fc4.out_features}"
-  )
+# Quantization helpers
 
-  int8_spec = {
-    "model": {
-        "name": "MLP_MNIST_INT8",
-        "architecture": arch_str,
-        "artifacts_dir": str(artifacts_dir),
-    },
-    "quantization": {
-        "activation_dtype": "int8",
-        "weight_dtype": "int8",
-        "accumulator_dtype": "int32",
-        "activation_qparams": activation_qparams,
-    },
-    "layers": layers_out,
-    "input": {
-        "tensor": "fc1_in",
-        "shape": [1, 784],
-        "normalized": True,
-        "note": "After ToTensor + Normalize((0.1307,), (0.3081,))",
-    },
-    "output": {
-        "tensor": "fc4_out",
-        "dim": model.fc4.out_features,
-        "meaning": "logits",
-    },
-  }
+def sym_int8_params(xmin: float, xmax: float) -> Tuple[float, int]:
+    qmax = 127
+    s = max(abs(xmin), abs(xmax), 1e-8) / qmax
+    return s, 0
 
-  spec_path = artifacts_dir / "int8_spec.json"
-  with spec_path.open("w", encoding="utf-8") as f:
-    json.dump(int8_spec, f, indent=2)
 
-  print(f"Saved INT8 spec to: {spec_path}")
+def quant_int8(x: torch.Tensor, scale: float) -> torch.Tensor:
+    q = torch.round(x / scale)
+    return torch.clamp(q, -128, 127).to(torch.int8)
 
-def parse_args() -> Config:
-  """Parse command line arguments into a Config object."""
-  parser = argparse.ArgumentParser(
-    description="Quantize FP32 MNIST MLP to INT8 and export artifacts."
-  )
-  parser.add_argument("--artifacts_dir", type=str, default="./artifacts")
-  parser.add_argument("--seed", type=int, default=42)
-  parser.add_argument("--num_bits_activation", type=int, default=8)
-  parser.add_argument("--num_bits_weight", type=int, default=8)
 
-  args = parser.parse_args()
-  return Config(
-    artifacts_dir=args.artifacts_dir,
-    seed=args.seed,
-    num_bits_activation=args.num_bits_activation,
-    num_bits_weight=args.num_bits_weight,
-  )
+def quant_weight_int8(w: torch.Tensor) -> Tuple[torch.Tensor, float, int]:
+    s, zp = sym_int8_params(float(w.min()), float(w.max()))
+    return quant_int8(w, s), s, zp
+
+
+def compute_requant_params(a_in: float, w: float, a_out: float) -> Tuple[int, int]:
+    """Compute M, shift so that acc32 * M >> shift approximates real scaling."""
+    rm = (a_in * w) / a_out
+    best_M, best_shift, best_err = 0, 0, 1e9
+    for sh in range(0, 32):
+        M = int(round(rm * (1 << sh)))
+        if M <= 0 or M >= (1 << 31):
+            continue
+        err = abs((M / (1 << sh)) - rm)
+        if err < best_err:
+            best_M, best_shift, best_err = M, sh, err
+    return best_M, best_shift
+
+
+# File export (.mem) in binary (two's complement)
+
+
+def int_to_bin_twos(val: int, bits: int) -> str:
+    """Convert signed integer to two's complement binary string of length `bits`."""
+    val = int(val)
+    if val < 0:
+        val += (1 << bits)
+    mask = (1 << bits) - 1
+    return format(val & mask, f"0{bits}b")
+
+
+def save_weight_mem(w: np.ndarray, layer_idx: int, n_par: int, out_dir: Path) -> None:
+    """Save layer weights as binary .mem compatible with VHDL TEXTIO ROM.
+
+    Each line: 8 weights (INT8) packed into 64 bits:
+    - bits 7..0   : weight[base + 0]
+    - bits 15..8  : weight[base + 1]
+    ...
+    - bits 63..56 : weight[base + 7]
+
+    String layout (left to right) is MSB -> LSB, so the rightmost 8 bits
+    correspond to weight[base + 0], matching dout_raw(7 downto 0) in VHDL.
+    """
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_f = out_dir / f"w{layer_idx}.mem"
+
+    out_features, in_features = w.shape
+    assert in_features % n_par == 0, "in_features must be multiple of n_par"
+
+    with out_f.open("w") as f:
+        for o in range(out_features):
+            blocks = in_features // n_par
+            for b in range(blocks):
+                base = b * n_par
+                # Build 64-bit word as binary string: weight[base+7] ... weight[base+0]
+                bits_word = []
+                for k in reversed(range(n_par)):
+                    val = int(w[o, base + k])
+                    bits_word.append(int_to_bin_twos(val, 8))
+                # Join into 64-bit line
+                line = "".join(bits_word)
+                f.write(line + "\n")
+
+
+def save_bias_mem(b: np.ndarray, layer_idx: int, out_dir: Path) -> None:
+    """Save layer bias as binary .mem (one INT32 per line, two's complement)."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_f = out_dir / f"b{layer_idx}.mem"
+
+    with out_f.open("w") as f:
+        for x in b:
+            line = int_to_bin_twos(int(x), 32)
+            f.write(line + "\n")
+
+
+# Main quantization pipeline
+
+def quantize_mlp(cfg: QuantConfig) -> None:
+    torch.manual_seed(cfg.seed)
+    np.random.seed(cfg.seed)
+
+    sd = load_model_state_dict(cfg.model_path)
+    act_stats = load_act_stats(cfg.act_stats_path)
+
+    # Where .mem files and JSON will be placed
+    cfg.output_dir.mkdir(parents=True, exist_ok=True)
+    out_w = cfg.output_dir  # place wX.mem directly here
+    out_b = cfg.output_dir  # place bX.mem directly here
+
+    specs: List[LayerQuantSpec] = []
+
+    prev_scale, prev_zp = 1.0, 0
+
+    for idx, (name, exp_in, exp_out) in enumerate(LAYER_ORDER, start=1):
+        W = sd[f"{name}.weight"]
+        B = sd[f"{name}.bias"]
+
+        of, inf = W.shape
+        if (inf != exp_in) or (of != exp_out):
+            raise ValueError(
+                f"Layer {name} shape mismatch: got {(of, inf)}, "
+                f"expected {(exp_out, exp_in)}"
+            )
+
+        # Activation input range
+        if name in act_stats:
+            a_min, a_max = act_stats[name]["min"], act_stats[name]["max"]
+        else:
+            m = float(W.abs().max())
+            a_min, a_max = -m, m
+
+        a_in_scale, a_in_zp = sym_int8_params(a_min, a_max)
+
+        # Weight INT8
+        W_q, w_scale, w_zp = quant_weight_int8(W)
+
+        # Bias INT32
+        bias_scale = a_in_scale * w_scale
+        B_int32 = torch.round(B / bias_scale).to(torch.int32)
+
+        # Activation output scale
+        if name in act_stats:
+            amin_o, amax_o = act_stats[name]["min"], act_stats[name]["max"]
+        else:
+            amin_o, amax_o = -1.0, 1.0
+
+        a_out_scale, a_out_zp = sym_int8_params(amin_o, amax_o)
+
+        # Requantization
+        M, shift = compute_requant_params(a_in_scale, w_scale, a_out_scale)
+
+        # Export .mem for this layer
+        save_weight_mem(W_q.numpy(), idx, cfg.n_par, out_w)
+        save_bias_mem(B_int32.numpy(), idx, out_b)
+
+        specs.append(
+            LayerQuantSpec(
+                name=name,
+                in_size=inf,
+                out_size=of,
+                act_in_scale=a_in_scale,
+                act_in_zp=a_in_zp,
+                act_out_scale=a_out_scale,
+                act_out_zp=a_out_zp,
+                weight_scale=w_scale,
+                weight_zp=w_zp,
+                bias_scale=bias_scale,
+                requant_M=M,
+                requant_shift=shift,
+            )
+        )
+
+        prev_scale, prev_zp = a_out_scale, a_out_zp
+
+    # JSON spec
+    with (cfg.output_dir / "int8_spec.json").open("w") as f:
+        json.dump(
+            {
+                "n_par": cfg.n_par,
+                "layers": [asdict(s) for s in specs],
+            },
+            f,
+            indent=2,
+        )
 
 
 def main() -> None:
-  """Entry point for INT8 quantization."""
-  cfg = parse_args()
-  set_seed(cfg.seed)
-  quantize_model(cfg)
+    cfg = parse_args()
+    quantize_mlp(cfg)
 
 
 if __name__ == "__main__":
-  main()
+    main()

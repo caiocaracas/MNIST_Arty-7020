@@ -1,0 +1,61 @@
+{
+  "n_par": 8,
+  "layers": [
+    {
+      "name": "fc1",
+      "in_size": 784,
+      "out_size": 256,
+      "act_in_scale": 0.003845633014919251,
+      "act_in_zp": 0,
+      "act_out_scale": 0.007874015748031496,
+      "act_out_zp": 0,
+      "weight_scale": 0.003845633014919251,
+      "weight_zp": 0,
+      "bias_scale": 1.4788893285436928e-05,
+      "requant_M": 4033381,
+      "requant_shift": 31
+    },
+    {
+      "name": "fc2",
+      "in_size": 256,
+      "out_size": 128,
+      "act_in_scale": 0.0027469539736199567,
+      "act_in_zp": 0,
+      "act_out_scale": 0.007874015748031496,
+      "act_out_zp": 0,
+      "weight_scale": 0.0027469539736199567,
+      "weight_zp": 0,
+      "bias_scale": 7.54575613318647e-06,
+      "requant_M": 2057957,
+      "requant_shift": 31
+    },
+    {
+      "name": "fc3",
+      "in_size": 128,
+      "out_size": 64,
+      "act_in_scale": 0.002387822847666703,
+      "act_in_zp": 0,
+      "act_out_scale": 0.007874015748031496,
+      "act_out_zp": 0,
+      "weight_scale": 0.002387822847666703,
+      "weight_zp": 0,
+      "bias_scale": 5.701697951839122e-06,
+      "requant_M": 777513,
+      "requant_shift": 30
+    },
+    {
+      "name": "fc4",
+      "in_size": 64,
+      "out_size": 10,
+      "act_in_scale": 0.002590872406020878,
+      "act_in_zp": 0,
+      "act_out_scale": 0.007874015748031496,
+      "act_out_zp": 0,
+      "weight_scale": 0.002590872406020878,
+      "weight_zp": 0,
+      "bias_scale": 6.7126198242804135e-06,
+      "requant_M": 114421,
+      "requant_shift": 27
+    }
+  ]
+}
